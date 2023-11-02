@@ -72,7 +72,7 @@ func main() {
 						Resources: &runpb.ResourceRequirements{
 							Limits: map[string]string{
 								"cpu":    "1",
-								"memory": "1024Mi",
+								"memory": "5Gi",
 							},
 						},
 					},
