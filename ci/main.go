@@ -55,8 +55,10 @@ func main() {
 	// define service request
 	gcrRequest := &runpb.UpdateServiceRequest{
 		Service: &runpb.Service{
-			Name: GCR_SERVICE_URL,
+			Name:    GCR_SERVICE_URL,
+			Ingress: runpb.IngressTraffic_INGRESS_TRAFFIC_ALL,
 			Template: &runpb.RevisionTemplate{
+				MaxInstanceRequestConcurrency: 1,
 				Containers: []*runpb.Container{
 					{
 						Image: addr,
@@ -67,6 +69,10 @@ func main() {
 							},
 						},
 					},
+				},
+				Scaling: &runpb.RevisionScaling{
+					MinInstanceCount: 1,
+					MaxInstanceCount: 1,
 				},
 			},
 		},
