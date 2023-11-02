@@ -6,6 +6,7 @@ mod handlers;
 mod server;
 
 use server::get_app;
+use tide::log;
 
 fn main() -> tide::Result<()> {
     task::block_on(async {
@@ -13,7 +14,10 @@ fn main() -> tide::Result<()> {
 
         let app = get_app().await?;
 
-        app.listen("0.0.0.0:8080").await?;
+        log::start();
+        log::info!("Server running on 3030");
+
+        app.listen("0.0.0.0:3030").await?;
         Ok(())
     })
 }
