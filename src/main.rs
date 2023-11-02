@@ -13,7 +13,7 @@ fn main() -> tide::Result<()> {
 
         let app = get_app().await?;
 
-        app.listen("0.0.0.0:3030").await?;
+        app.listen("0.0.0.0:8080").await?;
         Ok(())
     })
 }
