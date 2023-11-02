@@ -33,9 +33,13 @@ func main() {
 
 	c := rust.
 		WithDirectory("/fantasy-api", source).
+		// WithExec([]string{"USER=root", "cargo", "new", "--bin", "fantasy-api"}).
 		WithWorkdir("/fantasy-api").
 		WithExec([]string{"cargo", "build", "--release"}).
-		WithEntrypoint([]string{"cargo", "run"})
+		// WithExec([]string{"rm", "src/*.rs"}).
+		// WithExec([]string{"rm", "./target/release/deps/fantasy_api*"}).
+		// WithExec([]string{"cargo", "install", "--path", "."}).
+		WithEntrypoint([]string{"./target/release/fantasy-api"})
 
 	// publish container to Google Container Registry
 	addr, err := c.Publish(ctx, GCR_PUBLISH_ADDRESS)
