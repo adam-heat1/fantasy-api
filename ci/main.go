@@ -34,7 +34,8 @@ func main() {
 	c := rust.
 		WithDirectory("/fantasy-api", source).
 		WithWorkdir("/fantasy-api").
-		WithExec([]string{"cargo", "build", "--release"})
+		WithExec([]string{"cargo", "build", "--release"}).
+		WithEntrypoint([]string{"cargo", "run"})
 
 	// publish container to Google Container Registry
 	addr, err := c.Publish(ctx, GCR_PUBLISH_ADDRESS)
@@ -71,7 +72,7 @@ func main() {
 					},
 				},
 				Scaling: &runpb.RevisionScaling{
-					MinInstanceCount: 1,
+					MinInstanceCount: 0,
 					MaxInstanceCount: 1,
 				},
 			},
