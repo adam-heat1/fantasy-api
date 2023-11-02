@@ -69,6 +69,12 @@ func main() {
 								ContainerPort: 8080,
 							},
 						},
+						Resources: &runpb.ResourceRequirements{
+							Limits: map[string]string{
+								"cpu":    "1",
+								"memory": "1024MiB",
+							},
+						},
 					},
 				},
 				Scaling: &runpb.RevisionScaling{
