@@ -10,8 +10,10 @@ import (
 	"dagger.io/dagger"
 )
 
-const GCR_SERVICE_URL = "projects/fantasy-app-403821/locations/us-central1/services/fantasy-api"
-const GCR_PUBLISH_ADDRESS = "gcr.io/fantasy-app-403821/fantasy-api"
+const PROJECT_ID = "fantasy-app-403821"
+const APP_NAME = "fantasy-api"
+const GCR_SERVICE_URL = "projects/" + PROJECT_ID + "/locations/us-central1/services/" + APP_NAME
+const GAR_PUBLISH_ADDRESS = "us-central1-docker.pkg.dev/" + PROJECT_ID + "/" + APP_NAME + "/api"
 
 func main() {
 	// create Dagger client
@@ -24,7 +26,7 @@ func main() {
 
 	// get working directory on host
 	source := daggerClient.Host().Directory(".", dagger.HostDirectoryOpts{
-		Exclude: []string{"ci", "target"},
+		Include: []string{"src", "Cargo.toml", "Cargo.lock"},
 	})
 
 	// build application
@@ -33,16 +35,12 @@ func main() {
 
 	c := rust.
 		WithDirectory("/fantasy-api", source).
-		// WithExec([]string{"USER=root", "cargo", "new", "--bin", "fantasy-api"}).
 		WithWorkdir("/fantasy-api").
 		WithExec([]string{"cargo", "build", "--release"}).
-		// WithExec([]string{"rm", "src/*.rs"}).
-		// WithExec([]string{"rm", "./target/release/deps/fantasy_api*"}).
-		// WithExec([]string{"cargo", "install", "--path", "."}).
 		WithEntrypoint([]string{"./target/release/fantasy-api"})
 
 	// publish container to Google Container Registry
-	addr, err := c.Publish(ctx, GCR_PUBLISH_ADDRESS)
+	addr, err := c.Publish(ctx, GAR_PUBLISH_ADDRESS)
 	if err != nil {
 		panic(err)
 	}
@@ -70,13 +68,13 @@ func main() {
 						Ports: []*runpb.ContainerPort{
 							{
 								Name:          "http1",
-								ContainerPort: 3030,
+								ContainerPort: 8080,
 							},
 						},
 						Resources: &runpb.ResourceRequirements{
 							Limits: map[string]string{
 								"cpu":    "1",
-								"memory": "4Gi",
+								"memory": "512Mi",
 							},
 						},
 					},

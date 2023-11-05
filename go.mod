@@ -3,13 +3,16 @@ module example.com/m/v2
 go 1.21.3
 
 require (
+	cloud.google.com/go/run v1.3.3
+	dagger.io/dagger v0.9.2
+)
+
+require (
 	cloud.google.com/go v0.110.8 // indirect
 	cloud.google.com/go/compute v1.23.1 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	cloud.google.com/go/iam v1.1.3 // indirect
 	cloud.google.com/go/longrunning v0.5.2 // indirect
-	cloud.google.com/go/run v1.3.3 // indirect
-	dagger.io/dagger v0.9.2 // indirect
 	github.com/99designs/gqlgen v0.17.31 // indirect
 	github.com/Khan/genqlient v0.6.0 // indirect
 	github.com/adrg/xdg v0.4.0 // indirect

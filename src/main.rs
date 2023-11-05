@@ -1,23 +1,26 @@
-use async_std::task;
-use dotenv::dotenv;
-
-mod error_response;
 mod handlers;
-mod server;
 
-use server::get_app;
-use tide::log;
+use actix_web::{web, App, HttpServer};
+use dotenv::dotenv;
+use log::{info};
 
-fn main() -> tide::Result<()> {
-    task::block_on(async {
-        dotenv().ok();
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
+    dotenv().ok();
 
-        let app = get_app().await?;
+    info!("Starting server on 8080");
 
-        log::start();
-        log::info!("Server running on 3030");
 
-        app.listen("0.0.0.0:3030").await?;
-        Ok(())
+    HttpServer::new(|| {
+        App::new()
+            // "/"
+            .service(handlers::hello)
+            // "/echo"
+            .service(handlers::echo)
+            // "/hey"
+            .route("/hey", web::get().to(handlers::manual_hello))
     })
+    .bind("0.0.0.0:8080")?
+    .run()
+    .await
 }
