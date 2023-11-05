@@ -38,5 +38,8 @@ jobs:
         name: Install Dagger CLI
         run: cd /usr/local && { curl -L https://dl.dagger.io/dagger/install.sh | sh; cd -; }
       -
+        name: Setup Artifact Registry
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
+      -
         name: Release and deploy with Dagger
         run: dagger run go run ci/main.go
