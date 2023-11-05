@@ -1,8 +1,8 @@
-mod handlers;
-
-use actix_web::{web, App, HttpServer};
+use actix_web::{App, HttpServer};
 use dotenv::dotenv;
-use log::{info};
+use fantasy_api::handlers;
+use log::info;
+use handlers::email::get_email_by_username;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
@@ -13,12 +13,11 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(|| {
         App::new()
-            // "/"
-            .service(handlers::hello)
+            // "/email?username=xxx"
+            .service(get_email_by_username)
             // "/echo"
-            .service(handlers::echo)
-            // "/hey"
-            .route("/hey", web::get().to(handlers::manual_hello))
+            // .service(handlers::echo)
+            // .route("/email", web::get().to(get_email_by_username()))
     })
     .bind("0.0.0.0:8080")?
     .run()
