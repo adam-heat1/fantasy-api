@@ -1,6 +1,9 @@
 use sqlx::{Error, Row};
 
-use crate::data::{data_client::DataClient, models::app_user::AppUser};
+use crate::{
+    data::{data_client::DataClient, models::app_user::AppUser},
+    handlers::account::UpdateUsernameRequest,
+};
 
 pub struct AppUserRepository;
 
@@ -27,6 +30,27 @@ impl AppUserRepository {
         return Ok(email);
     }
 
+    pub async fn update_username(user: &UpdateUsernameRequest) -> Result<String, Error> {
+        let pool = DataClient::connect().await?;
+
+        sqlx::query(
+            "
+            Update 
+                app_user
+            SET 
+                username = $1
+            WHERE
+                user_id = $2
+            ",
+        )
+        .bind(user.username.clone())
+        .bind(user.user_id as i64)
+        .execute(&pool)
+        .await?;
+
+        return Ok("Updated username".to_string());
+    }
+
     pub async fn fetch_user_by_firebase_id(firebase_id: String) -> Result<AppUser, Error> {
         let pool = DataClient::connect().await?;
 
@@ -48,7 +72,7 @@ impl AppUserRepository {
         .fetch_one(&pool)
         .await?;
 
-        let user = AppUser{
+        let user = AppUser {
             id: res.get::<i64, _>("id") as u64,
             username: res.get("username"),
             firebase_id: res.get("firebase_id"),
@@ -80,7 +104,7 @@ impl AppUserRepository {
         .fetch_one(&pool)
         .await?;
 
-        let user = AppUser{
+        let user = AppUser {
             id: res.get::<i64, _>("id") as u64,
             username: res.get("username"),
             firebase_id: res.get("firebase_id"),
