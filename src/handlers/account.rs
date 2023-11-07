@@ -1,5 +1,3 @@
-// use std::env;
-
 use crate::services::account_service::AccountService;
 use actix_web::{
     get, put,
@@ -71,7 +69,7 @@ pub(crate) async fn update_username(body: Json<UpdateUsernameRequest>) -> impl R
             if e.to_string().to_lowercase().contains("no rows returned") {
                 return HttpResponse::NotFound().body("No user found with that username!");
             }
-            HttpResponse::InternalServerError().body("Error fetching email by username!")
+            HttpResponse::InternalServerError().body("Error updating username!")
         },
         |email| HttpResponse::Ok().body(email),
     )

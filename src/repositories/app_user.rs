@@ -33,20 +33,24 @@ impl AppUserRepository {
     pub async fn update_username(user: &UpdateUsernameRequest) -> Result<String, Error> {
         let pool = DataClient::connect().await?;
 
-        sqlx::query(
+        let res = sqlx::query(
             "
             Update 
                 app_user
             SET 
                 username = $1
             WHERE
-                user_id = $2
+                id = $2
             ",
         )
         .bind(user.username.clone())
         .bind(user.user_id as i64)
         .execute(&pool)
         .await?;
+
+        if res.rows_affected() == 0 {
+            return Err(Error::RowNotFound);
+        }
 
         return Ok("Updated username".to_string());
     }
