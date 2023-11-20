@@ -10,3 +10,4 @@ target/
 *.pdb
 
 SERVICE-ACCOUNT-KEY.json
+.env
