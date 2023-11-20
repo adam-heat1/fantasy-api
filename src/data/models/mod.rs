@@ -7,6 +7,7 @@ pub mod country;
 pub mod division;
 pub mod elite_competitor;
 pub mod gender;
+pub mod news;
 pub mod region;
 pub mod score;
 pub mod tournament;

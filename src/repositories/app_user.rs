@@ -2,7 +2,7 @@ use sqlx::{Error, Row};
 
 use crate::{
     data::{data_client::DataClient, models::app_user::AppUser},
-    handlers::account::UpdateUsernameRequest,
+    handlers::account::{CreateAccountViewModel, UpdateUsernameViewModel},
 };
 
 pub struct AppUserRepository;
@@ -30,12 +30,12 @@ impl AppUserRepository {
         return Ok(email);
     }
 
-    pub async fn update_username(user: &UpdateUsernameRequest) -> Result<String, Error> {
+    pub async fn update_username(user: &UpdateUsernameViewModel) -> Result<String, Error> {
         let pool = DataClient::connect().await?;
 
         let res = sqlx::query(
             "
-            Update 
+            UPDATE 
                 app_user
             SET 
                 username = $1
@@ -53,6 +53,31 @@ impl AppUserRepository {
         }
 
         return Ok("Updated username".to_string());
+    }
+
+    pub async fn create_app_user(user: &CreateAccountViewModel) -> Result<i64, Error> {
+        let pool = DataClient::connect().await?;
+
+        let res = sqlx::query(
+            "
+            INSERT INTO
+                app_user
+            (username, firebase_id, email) 
+            VALUES 
+                ($1, $2, $3)
+            RETURNING
+                id
+            ",
+        )
+        .bind(user.username.clone())
+        .bind(user.firebase_id.clone())
+        .bind(user.email.clone())
+        .fetch_one(&pool)
+        .await?;
+
+        let id = res.get("id");
+
+        return Ok(id);
     }
 
     pub async fn fetch_user_by_firebase_id(firebase_id: String) -> Result<AppUser, Error> {
@@ -82,6 +107,7 @@ impl AppUserRepository {
             firebase_id: res.get("firebase_id"),
             email: res.get("email"),
             profile_url: res.get("profile_url"),
+            leagues: vec![],
         };
 
         return Ok(user);
@@ -114,6 +140,7 @@ impl AppUserRepository {
             firebase_id: res.get("firebase_id"),
             email: res.get("email"),
             profile_url: res.get("profile_url"),
+            leagues: vec![],
         };
 
         return Ok(user);

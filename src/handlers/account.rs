@@ -1,24 +1,26 @@
 use crate::services::account_service::AccountService;
 use actix_web::{
-    get, put,
+    get, post, put,
     web::{Json, Query, ServiceConfig},
     HttpResponse, Responder,
 };
-use serde_derive::Deserialize;
+use serde_derive::{Deserialize, Serialize};
+use serde_json::json;
 
 pub fn configure(config: &mut ServiceConfig) {
     config
         .service(get_email_by_username)
-        .service(update_username);
+        .service(update_username)
+        .service(create_account);
 }
 
 #[derive(Deserialize)]
-pub struct EmailRequest {
+pub struct EmailViewModel {
     username: String,
 }
 
 #[get("/email")]
-pub(crate) async fn get_email_by_username(req: Query<EmailRequest>) -> impl Responder {
+pub(crate) async fn get_email_by_username(req: Query<EmailViewModel>) -> impl Responder {
     let username = &req.username;
     if username.is_empty() {
         return HttpResponse::BadRequest().body("No username provided!");
@@ -39,14 +41,14 @@ pub(crate) async fn get_email_by_username(req: Query<EmailRequest>) -> impl Resp
         )
 }
 
-#[derive(Deserialize, Clone)]
-pub struct UpdateUsernameRequest {
+#[derive(Deserialize, Clone, Debug)]
+pub struct UpdateUsernameViewModel {
     pub user_id: i32,
     pub username: String,
 }
 
 #[put("/username")]
-pub(crate) async fn update_username(body: Json<UpdateUsernameRequest>) -> impl Responder {
+pub(crate) async fn update_username(body: Json<UpdateUsernameViewModel>) -> impl Responder {
     if body.username.is_empty() {
         return HttpResponse::BadRequest().body("No username provided!");
     }
@@ -55,39 +57,56 @@ pub(crate) async fn update_username(body: Json<UpdateUsernameRequest>) -> impl R
         return HttpResponse::BadRequest().body("No user id provided!");
     }
 
-    let user: &UpdateUsernameRequest = &body.into_inner();
+    let user: &UpdateUsernameViewModel = &body.into_inner();
 
-    //Handle success and failure paths
     AccountService::update_username(user).await.map_or_else(
         |e| {
-            log::error!(
-                "Error updating username for user: {}: -> {:?}",
-                user.user_id,
-                e
-            );
+            log::error!("Error updating username for user: {:?}: -> {:?}", user, e);
 
             if e.to_string().to_lowercase().contains("no rows returned") {
                 return HttpResponse::NotFound().body("No user found with that username!");
             }
             HttpResponse::InternalServerError().body("Error updating username!")
         },
-        |email| HttpResponse::Ok().body(email),
+        |message| HttpResponse::Ok().body(message),
     )
 }
 
-// #[post("/echo")]
-// pub(crate) async fn echo(req_body: String) -> impl Responder {
-//     HttpResponse::Ok().body(req_body)
-// }
+#[derive(Deserialize, Clone, Debug)]
+pub struct CreateAccountViewModel {
+    pub username: String,
+    pub firebase_id: String,
+    pub email: String,
+    pub profile_url: String,
+}
 
-// pub(crate) async fn manual_hello() -> impl Responder {
-//     // Test env "TARGET" which defined when `docker run`, or `gcloud run deploy --set-env-vars`
-//     // Depend on your platform target. (See README.md)
-//     let test_target = match env::var("TARGET") {
-//         Ok(target) => format!("Hey {target}!"),
-//         Err(_e) => "No TARGET env defined!".to_owned(),
-//     };
+#[derive(Serialize, Clone, Debug)]
+pub struct CreateAccountDomainModel {
+    pub id: u64,
+    pub username: String,
+    pub email: String,
+    pub profile_url: String,
+}
 
-//     // Response with test_target
-//     HttpResponse::Ok().body(test_target)
-// }
+#[post("/")]
+pub(crate) async fn create_account(body: Json<CreateAccountViewModel>) -> impl Responder {
+    if body.username.trim().is_empty() {
+        return HttpResponse::BadRequest().body("No username provided!");
+    }
+    if body.firebase_id.trim().is_empty() {
+        return HttpResponse::BadRequest().body("No firebase id provided!");
+    }
+    if body.email.trim().is_empty() {
+        return HttpResponse::BadRequest().body("No email provided!");
+    }
+
+    let user: &CreateAccountViewModel = &body.into_inner();
+
+    AccountService::create_account(user).await.map_or_else(
+        |e| {
+            log::error!("Error creating account: {:?}: -> {:?}", user, e);
+            HttpResponse::InternalServerError().body("Error updating username!")
+        },
+        |account| HttpResponse::Ok().json(json!(account)),
+    )
+}

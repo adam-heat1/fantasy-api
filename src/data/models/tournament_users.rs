@@ -1,4 +1,4 @@
-use super::{tournament::Tournament, app_user::AppUser};
+use super::{app_user::AppUser, tournament::Tournament};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -9,5 +9,5 @@ pub struct TournamentUsers {
     pub display_name: String,
 
     pub tournament: Tournament,
-    pub user: AppUser,
+    pub user: Option<AppUser>,
 }
