@@ -21,6 +21,9 @@ impl NewsRepository {
                 date
             FROM 
                 news
+            ORDER BY
+                id DESC
+            LIMIT 100
             ",
         )
         .map(|row: PgRow| {

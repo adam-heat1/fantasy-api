@@ -1,4 +1,4 @@
-use std::{env, fmt};
+use std::env;
 
 use crate::{
     data::models::news::News, handlers::news::CreateNewsBlurbViewModel,
@@ -18,13 +18,13 @@ impl NewsService {
 
         let news = News {
             id: 0,
-            title: article.title,
-            description: article.description,
-            link: article.link,
-            header: Self::get_header_by_source(src).await,
-            date: article.date,
-            label: "".to_string(),
-            image_url: Self::get_image_url_by_source(src),
+            title: Some(article.title),
+            description: Some(article.description),
+            link: Some(article.link),
+            header: Some(Self::get_header_by_source(src).await),
+            date: Some(article.date),
+            label: None,
+            image_url: Some(Self::get_image_url_by_source(src)),
         };
 
         NewsRepository::insert_article(news).await

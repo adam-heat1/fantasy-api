@@ -24,6 +24,16 @@ func main() {
 	}
 	defer daggerClient.Close()
 
+	if os.Getenv("DATABASE_URL") == "" {
+		panic("Environment variable DATABASE_URL is not set")
+	}
+	if os.Getenv("NTFY_UNKNOWN_MEDIA") == "" {
+		panic("Environment variable NTFY_UNKNOWN_MEDIA is not set")
+	}
+	if os.Getenv("NTFY_UNKNOWN_ERROR") == "" {
+		panic("Environment variable NTFY_UNKNOWN_ERROR is not set")
+	}
+
 	// get working directory on host
 	source := daggerClient.Host().Directory(".", dagger.HostDirectoryOpts{
 		Include: []string{"src", "Cargo.toml", "Cargo.lock"},
@@ -37,6 +47,9 @@ func main() {
 		WithDirectory("/fantasy-api", source).
 		WithWorkdir("/fantasy-api").
 		WithExec([]string{"cargo", "build", "--release"}).
+		WithEnvVariable("DATABASE_URL", os.Getenv("DATABASE_URL")).
+		WithEnvVariable("NTFY_UNKNOWN_MEDIA", os.Getenv("NTFY_UNKNOWN_MEDIA")).
+		WithEnvVariable("NTFY_UNKNOWN_ERROR", os.Getenv("NTFY_UNKNOWN_ERROR")).
 		WithEntrypoint([]string{"./target/release/fantasy-api"})
 
 	// publish container to Google Container Registry

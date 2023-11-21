@@ -26,11 +26,12 @@ pub(crate) async fn get_email_by_username(req: Query<EmailViewModel>) -> impl Re
     let username = &req.username;
     let unknown_error_provider =
         env::var("NTFY_UNKNOWN_ERROR").expect("NTFY_UNKNOWN_ERROR must be set");
-    let client = reqwest::blocking::Client::new();
+    let client = reqwest::Client::new();
     let _ = client
         .post(format!("ntfy.sh/{}", unknown_error_provider))
         .body(username.to_string())
-        .send();
+        .send()
+        .await;
     if username.is_empty() {
         return HttpResponse::BadRequest().body("No username provided!");
     }

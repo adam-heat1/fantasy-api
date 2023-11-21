@@ -27,7 +27,7 @@ pub(crate) async fn get_news() -> impl Responder {
                 .send();
             HttpResponse::InternalServerError().body("Error creating article!")
         },
-        |_| HttpResponse::Ok().finish(),
+        |response| HttpResponse::Ok().json(response),
     )
 }
 

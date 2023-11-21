@@ -33,7 +33,9 @@ jobs:
         run: cd /usr/local && { curl -L https://dl.dagger.io/dagger/install.sh | sh; cd -; }
       - name: Setup Artifact Registry
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
-      - name: "Create env file"
-        run: echo "${{ secrets.ENV_FILE }}" > .env
       - name: Release and deploy with Dagger
         run: dagger run go run ci/main.go
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          NTFY_UNKNOWN_MEDIA: ${{ secrets.NTFY_UNKNOWN_MEDIA }}
+          NTFY_UNKNOWN_ERROR: ${{ secrets.NTFY_UNKNOWN_ERROR }}
