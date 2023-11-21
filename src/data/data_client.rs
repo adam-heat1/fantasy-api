@@ -1,7 +1,7 @@
 use std::env;
 
 use dotenv::dotenv;
-use sqlx::{postgres::PgPoolOptions, Pool, Postgres, Error};
+use sqlx::{postgres::PgPoolOptions, Error, Pool, Postgres};
 
 pub struct DataClient;
 
@@ -12,8 +12,9 @@ impl DataClient {
         let connection_string = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
 
         let pool = PgPoolOptions::new()
-        .max_connections(5)
-        .connect(&connection_string).await?;
+            .max_connections(5)
+            .connect(&connection_string)
+            .await?;
 
         Ok(pool)
     }

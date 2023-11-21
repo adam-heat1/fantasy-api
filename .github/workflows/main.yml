@@ -34,7 +34,6 @@ jobs:
       - name: Setup Artifact Registry
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
       - name: "Create env file"
-        run: |
-          echo "${{ secrets.ENV_FILE }}" > .env
+        run: echo "${{ secrets.ENV_FILE }}" > .env
       - name: Release and deploy with Dagger
         run: dagger run go run ci/main.go

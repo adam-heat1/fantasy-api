@@ -16,7 +16,15 @@ pub fn configure(config: &mut ServiceConfig) {
 pub(crate) async fn get_news() -> impl Responder {
     NewsService::get_news().await.map_or_else(
         |e| {
+            let error_message = format!("Error getting news: -> {:?}", e);
             log::error!("Error getting news: -> {:?}", e);
+            let unknown_error_provider =
+                env::var("NTFY_UNKNOWN_ERROR").expect("NTFY_UNKNOWN_ERROR must be set");
+            let client = reqwest::blocking::Client::new();
+            let _ = client
+                .post(format!("ntfy.sh/{}", unknown_error_provider))
+                .body(error_message)
+                .send();
             HttpResponse::InternalServerError().body("Error creating article!")
         },
         |_| HttpResponse::Ok().finish(),
