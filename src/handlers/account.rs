@@ -1,3 +1,5 @@
+use std::env;
+
 use crate::services::account_service::AccountService;
 use actix_web::{
     get, post, put,
@@ -30,11 +32,20 @@ pub(crate) async fn get_email_by_username(req: Query<EmailViewModel>) -> impl Re
         .await
         .map_or_else(
             |e| {
+                let error_message =
+                    format!("Error fetching email by username: {}: -> {:?}", username, e);
                 log::error!("Error fetching email by username: {}: -> {:?}", username, e);
 
                 if e.to_string().to_lowercase().contains("no rows returned") {
                     return HttpResponse::NotFound().body("No user found with that username!");
                 }
+                let unknown_error_provider =
+                    env::var("NTFY_UNKNOWN_ERROR").expect("NTFY_UNKNOWN_ERROR must be set");
+                let client = reqwest::blocking::Client::new();
+                let _ = client
+                    .post(format!("ntfy.sh/{}", unknown_error_provider))
+                    .body(error_message)
+                    .send();
                 HttpResponse::InternalServerError().body("Error fetching email by username!")
             },
             |email| HttpResponse::Ok().body(email),
