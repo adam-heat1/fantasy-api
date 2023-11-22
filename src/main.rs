@@ -11,8 +11,8 @@ async fn main() -> std::io::Result<()> {
 
     HttpServer::new(|| {
         App::new()
-            .service(scope("/v1/account").configure(account::configure))
-            .service(scope("/v1/news").configure(news::configure))
+            .service(scope("account/v1").configure(account::configure))
+            .service(scope("/news/v1").configure(news::configure))
     })
     .bind("0.0.0.0:8080")?
     .run()

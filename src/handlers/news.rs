@@ -12,8 +12,22 @@ pub fn configure(config: &mut ServiceConfig) {
     config.service(get_news).service(create_news_blurb);
 }
 
-#[get("/")]
+#[get("/feed")]
 pub(crate) async fn get_news() -> impl Responder {
+    log::info!("Getting news");
+    let unknown_error_provider =
+        env::var("NTFY_UNKNOWN_ERROR").expect("NTFY_UNKNOWN_ERROR must be set");
+    let client = reqwest::Client::new();
+    let _ = client
+        .post(format!("ntfy.sh/{}", unknown_error_provider))
+        .body("testing notification")
+        .send()
+        .await
+        .map_err(|e| {
+            log::info!("Getting news error");
+            log::error!("Error sending notification: -> {:?}", e);
+        });
+
     NewsService::get_news().await.map_or_else(
         |e| {
             let error_message = format!("Error getting news: -> {:?}", e);
