@@ -30,16 +30,16 @@ pub(crate) async fn get_news() -> impl Responder {
 
     NewsService::get_news().await.map_or_else(
         |e| {
-            let error_message = format!("Error getting news: -> {:?}", e);
+            let error_message = &format!("Error getting news: -> {:?}", e);
             log::error!("Error getting news: -> {:?}", e);
             let unknown_error_provider =
                 env::var("NTFY_UNKNOWN_ERROR").expect("NTFY_UNKNOWN_ERROR must be set");
             let client = reqwest::blocking::Client::new();
             let _ = client
                 .post(format!("ntfy.sh/{}", unknown_error_provider))
-                .body(error_message)
+                .body(error_message.to_string())
                 .send();
-            HttpResponse::InternalServerError().body("Error creating article!")
+            HttpResponse::InternalServerError().body(error_message.to_string())
         },
         |response| HttpResponse::Ok().json(response),
     )
@@ -54,7 +54,7 @@ pub struct CreateNewsBlurbViewModel {
     pub date: String,
 }
 
-#[post("/")]
+#[post("/article")]
 pub(crate) async fn create_news_blurb(body: Json<CreateNewsBlurbViewModel>) -> impl Responder {
     if body.source.trim().is_empty() {
         return HttpResponse::BadRequest().body("No source provided!");
