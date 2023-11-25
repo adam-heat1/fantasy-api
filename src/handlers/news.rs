@@ -1,6 +1,4 @@
-use std::env;
-
-use crate::services::news::NewsService;
+use crate::{services::news::NewsService, data::{constants::ntfy}, utils::{notification::spawn_notification}};
 use actix_web::{
     get, post,
     web::{Json, ServiceConfig},
@@ -14,32 +12,12 @@ pub fn configure(config: &mut ServiceConfig) {
 
 #[get("/feed")]
 pub(crate) async fn get_news() -> impl Responder {
-    log::info!("Getting news");
-    let unknown_error_provider =
-        env::var("NTFY_UNKNOWN_ERROR").expect("NTFY_UNKNOWN_ERROR must be set");
-    let client = reqwest::Client::new();
-    let _ = client
-        .post(format!("ntfy.sh/{}", unknown_error_provider))
-        .body("testing notification")
-        .send()
-        .await
-        .map_err(|e| {
-            log::info!("Getting news error");
-            log::error!("Error sending notification: -> {:?}", e);
-        });
-
     NewsService::get_news().await.map_or_else(
         |e| {
-            let error_message = &format!("Error getting news: -> {:?}", e);
-            log::error!("Error getting news: -> {:?}", e);
-            let unknown_error_provider =
-                env::var("NTFY_UNKNOWN_ERROR").expect("NTFY_UNKNOWN_ERROR must be set");
-            let client = reqwest::blocking::Client::new();
-            let _ = client
-                .post(format!("ntfy.sh/{}", unknown_error_provider))
-                .body(error_message.to_string())
-                .send();
-            HttpResponse::InternalServerError().body(error_message.to_string())
+            let error_message = format!("Error getting news: -> {:?}", e);
+            spawn_notification(ntfy::ERROR, error_message.clone());
+
+            HttpResponse::InternalServerError().body("Error getting news")
         },
         |response| HttpResponse::Ok().json(response),
     )
@@ -79,14 +57,8 @@ pub(crate) async fn create_news_blurb(body: Json<CreateNewsBlurbViewModel>) -> i
         .map_or_else(
             |e| {
                 let error_message = format!("Error creating account: {:?}: -> {:?}", article, e);
-                log::error!("Error creating account: {:?}: -> {:?}", article, e);
-                let unknown_error_provider =
-                    env::var("NTFY_UNKNOWN_ERROR").expect("NTFY_UNKNOWN_ERROR must be set");
-                let client = reqwest::blocking::Client::new();
-                let _ = client
-                    .post(format!("ntfy.sh/{}", unknown_error_provider))
-                    .body(error_message)
-                    .send();
+                spawn_notification(ntfy::ERROR, error_message);
+
                 HttpResponse::InternalServerError().body("Error creating article!")
             },
             |_| HttpResponse::Ok().finish(),

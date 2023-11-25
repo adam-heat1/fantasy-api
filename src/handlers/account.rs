@@ -28,7 +28,7 @@ pub(crate) async fn get_email_by_username(req: Query<EmailViewModel>) -> impl Re
         env::var("NTFY_UNKNOWN_ERROR").expect("NTFY_UNKNOWN_ERROR must be set");
     let client = reqwest::Client::new();
     let _ = client
-        .post(format!("ntfy.sh/{}", unknown_error_provider))
+        .post(unknown_error_provider)
         .body(username.to_string())
         .send()
         .await;
@@ -51,7 +51,7 @@ pub(crate) async fn get_email_by_username(req: Query<EmailViewModel>) -> impl Re
                     env::var("NTFY_UNKNOWN_ERROR").expect("NTFY_UNKNOWN_ERROR must be set");
                 let client = reqwest::blocking::Client::new();
                 let _ = client
-                    .post(format!("ntfy.sh/{}", unknown_error_provider))
+                    .post(unknown_error_provider)
                     .body(error_message)
                     .send();
                 HttpResponse::InternalServerError().body("Error fetching email by username!")
