@@ -55,7 +55,7 @@ impl NewsService {
             "krypton" | "crossfit krypton" => "Krypton",
             _ => {
                 let message = format!("Media provider {} not found", source);
-                spawn_notification(ntfy::MEDIA, message);
+                spawn_notification(ntfy::MEDIA.to_string(), message);
                 return "";
             }
         }

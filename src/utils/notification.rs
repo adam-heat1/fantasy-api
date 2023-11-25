@@ -1,10 +1,12 @@
+use std::env;
 use reqwest::Client;
 
 pub(crate)  async fn send_notification(topic: String, message: String) -> () {
-    log::error!("{}", error_message);
+    let topic_url = env::var(topic).expect("Topic not found.");
+    log::error!("{}", message);
 
     let _ =  Client::new()
-        .post(topic)
+        .post(topic_url)
         .body(message)
         .send()
         .await;

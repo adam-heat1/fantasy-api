@@ -15,7 +15,7 @@ pub(crate) async fn get_news() -> impl Responder {
     NewsService::get_news().await.map_or_else(
         |e| {
             let error_message = format!("Error getting news: -> {:?}", e);
-            spawn_notification(ntfy::ERROR, error_message.clone());
+            spawn_notification(ntfy::ERROR.to_string(), error_message.clone());
 
             HttpResponse::InternalServerError().body("Error getting news")
         },
@@ -57,7 +57,7 @@ pub(crate) async fn create_news_blurb(body: Json<CreateNewsBlurbViewModel>) -> i
         .map_or_else(
             |e| {
                 let error_message = format!("Error creating account: {:?}: -> {:?}", article, e);
-                spawn_notification(ntfy::ERROR, error_message);
+                spawn_notification(ntfy::ERROR.to_string(), error_message);
 
                 HttpResponse::InternalServerError().body("Error creating article!")
             },
