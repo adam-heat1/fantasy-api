@@ -10,5 +10,5 @@ pub struct AppUser {
     pub email: String,
     pub profile_url: String,
 
-    pub leagues: Vec<TournamentUsers>,
+    pub leagues: Option<Vec<TournamentUsers>>,
 }

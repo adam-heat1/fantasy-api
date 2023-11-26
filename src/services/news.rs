@@ -1,7 +1,8 @@
 use crate::{
-    data::{models::news::News, constants::ntfy}, handlers::news::CreateNewsBlurbViewModel,
-    utils::notification::spawn_notification,
+    data::{constants::ntfy, models::news::News},
+    handlers::news::request_models::CreateNewsBlurb,
     repositories::news::NewsRepository,
+    utils::notification::spawn_notification,
 };
 use sqlx::Error;
 
@@ -12,18 +13,18 @@ impl NewsService {
         NewsRepository::fetch_articles().await
     }
 
-    pub async fn create_article(article: CreateNewsBlurbViewModel) -> Result<(), Error> {
+    pub async fn create_article(article: CreateNewsBlurb) -> Result<(), Error> {
         let src = &article.source;
 
         let news = News {
             id: 0,
-            title: Some(article.title),
-            description: Some(article.description),
-            link: Some(article.link),
-            header: Some(Self::get_header_by_source(src).to_string()),
-            date: Some(article.date),
+            title: Some(article.title.trim().to_string()),
+            description: Some(article.description.trim().to_string()),
+            link: Some(article.link.trim().to_string()),
+            header: Some(Self::get_header_by_source(src).trim().to_string()),
+            date: Some(article.date.trim().to_string()),
             label: None,
-            image_url: Some(Self::get_image_url_by_source(src).to_string()),
+            image_url: Some(Self::get_image_url_by_source(src).trim().to_string()),
         };
 
         NewsRepository::insert_article(news).await
@@ -33,9 +34,7 @@ impl NewsService {
         match source.to_lowercase().trim() {
             "barbell spin" | "the barbell spin" => "The Barbell Spin",
             "heat 1" => "Heat 1",
-            "coffee pods & wods" | "cpw" | "coffee pods and wods" => {
-                "Coffee Pods & Wods"
-            }
+            "coffee pods & wods" | "cpw" | "coffee pods and wods" => "Coffee Pods & Wods",
             "mayhem" | "crossfit mayhem" => "Mayhem",
             "shut up and scribble" | "shut up & scribble" => "Shut Up & Scribble",
             "talking elite fitness" | "tef" => "Talking Elite Fitness",
@@ -46,9 +45,7 @@ impl NewsService {
             "pfaa" => "PFAA",
             "training think tank" | "ttt" => "Training Think Tank",
             "dave castro" | "castro" | "tdc" | "the dave castro" => "Dave Castro",
-            "get with the programming" | "gwtp" => {
-                "Get With The Programming"
-            }
+            "get with the programming" | "gwtp" => "Get With The Programming",
             "btwb" | "beyond the whiteboard" => "Beyond The Whiteboard",
             "josh bridges" => "Josh Bridges",
             "prvn" | "prvn fitness" => "PRVN",
@@ -78,7 +75,6 @@ impl NewsService {
             }
             "talking elite fitness" | "tef" => {
                 "https://heat1storage.blob.core.windows.net/media/talkingelitefitness.jpg"
-
             }
             "the sevan podcast" | "sevan" | "sevan podcast" => {
                 "https://heat1storage.blob.core.windows.net/user/1814.jpg"
@@ -95,17 +91,12 @@ impl NewsService {
             }
             "get with the programming" | "gwtp" => {
                 "https://heat1storage.blob.core.windows.net/media/getwiththeprogramming.jpg"
-
             }
             "btwb" | "beyond the whiteboard" => {
                 "https://heat1storage.blob.core.windows.net/media/btwb.jpg"
             }
-            "josh bridges" => {
-                "https://heat1storage.blob.core.windows.net/media/joshbridges.jpg"
-            }
-            "prvn" | "prvn fitness" => {
-                "https://heat1storage.blob.core.windows.net/media/prvn.jpg"
-            }
+            "josh bridges" => "https://heat1storage.blob.core.windows.net/media/joshbridges.jpg",
+            "prvn" | "prvn fitness" => "https://heat1storage.blob.core.windows.net/media/prvn.jpg",
             "krypton" | "crossfit krypton" => {
                 "https://heat1storage.blob.core.windows.net/media/krypton.jpg"
             }

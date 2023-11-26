@@ -2,7 +2,7 @@ use sqlx::{Error, Row};
 
 use crate::{
     data::{data_client::DataClient, models::app_user::AppUser},
-    handlers::account::{CreateAccountViewModel, UpdateUsernameViewModel},
+    handlers::account::request_models::UpdateUsername,
 };
 
 pub struct AppUserRepository;
@@ -21,7 +21,7 @@ impl AppUserRepository {
                 LOWER(username) = $1
             ",
         )
-        .bind(username.to_lowercase())
+        .bind(username.to_lowercase().trim())
         .fetch_one(&pool)
         .await?;
 
@@ -30,7 +30,32 @@ impl AppUserRepository {
         return Ok(email);
     }
 
-    pub async fn update_username(user: &UpdateUsernameViewModel) -> Result<String, Error> {
+    pub async fn fetch_is_new_username_valid(username: String) -> Result<bool, Error> {
+        let pool = DataClient::connect().await?;
+
+        let res = sqlx::query(
+            "
+            SELECT
+                id,
+                username
+            FROM
+                app_user
+            WHERE
+                LOWER(username) = $1
+            ",
+        )
+        .bind(username.to_lowercase().trim())
+        .fetch_all(&pool)
+        .await;
+
+        if res.unwrap().len() > 0 {
+            return Ok(false);
+        }
+
+        return Ok(true);
+    }
+
+    pub async fn update_username(user: &UpdateUsername) -> Result<String, Error> {
         let pool = DataClient::connect().await?;
 
         let res = sqlx::query(
@@ -43,7 +68,7 @@ impl AppUserRepository {
                 id = $2
             ",
         )
-        .bind(user.username.clone())
+        .bind(user.username.clone().trim())
         .bind(user.user_id as i64)
         .execute(&pool)
         .await?;
@@ -55,7 +80,7 @@ impl AppUserRepository {
         return Ok("Updated username".to_string());
     }
 
-    pub async fn create_app_user(user: &CreateAccountViewModel) -> Result<i64, Error> {
+    pub async fn create_app_user(user: AppUser) -> Result<i64, Error> {
         let pool = DataClient::connect().await?;
 
         let res = sqlx::query(
@@ -69,9 +94,9 @@ impl AppUserRepository {
                 id
             ",
         )
-        .bind(user.username.clone())
-        .bind(user.firebase_id.clone())
-        .bind(user.email.clone())
+        .bind(user.username.trim())
+        .bind(user.firebase_id.clone().trim())
+        .bind(user.email.clone().trim())
         .fetch_one(&pool)
         .await?;
 
@@ -97,7 +122,7 @@ impl AppUserRepository {
                 firebase_id = $1
             ",
         )
-        .bind(firebase_id)
+        .bind(firebase_id.trim())
         .fetch_one(&pool)
         .await?;
 
@@ -107,7 +132,7 @@ impl AppUserRepository {
             firebase_id: res.get("firebase_id"),
             email: res.get("email"),
             profile_url: res.get("profile_url"),
-            leagues: vec![],
+            leagues: None,
         };
 
         return Ok(user);
@@ -140,7 +165,7 @@ impl AppUserRepository {
             firebase_id: res.get("firebase_id"),
             email: res.get("email"),
             profile_url: res.get("profile_url"),
-            leagues: vec![],
+            leagues: None,
         };
 
         return Ok(user);

@@ -1,2 +1,2 @@
-pub mod account_service;
+pub mod account;
 pub mod news;
