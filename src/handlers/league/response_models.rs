@@ -1,14 +1,15 @@
-use serde_derive::Deserialize;
+use serde_derive::{Deserialize, Serialize};
 
-#[derive(Deserialize, Clone, Debug)]
-pub struct CreateTournamentResponse {
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct CreateLeagueResponse {
+    pub id: u64,
     pub name: String,
     #[serde(rename = "userId")]
-    pub user_id: i32,
+    pub user_id: u64,
     #[serde(rename = "competitionId")]
-    pub competition_id: i32,
+    pub competition_id: u64,
     #[serde(rename = "tournamentTypeId")]
-    pub tournament_type_id: i32,
+    pub tournament_type_id: u64,
     #[serde(rename = "isPrivate")]
     pub is_private: bool,
     pub passcode: Option<String>,

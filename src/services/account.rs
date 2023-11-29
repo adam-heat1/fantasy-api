@@ -33,7 +33,6 @@ impl AccountService {
     }
 
     pub async fn create_account(user: &CreateAccount) -> Result<CreateAccountResponse, Error> {
-        let user = user.clone();
         let profile_url = "https://heat1storage.blob.core.windows.net/user/athlete-avatar.jpg";
 
         let new_user = AppUser {
@@ -47,13 +46,13 @@ impl AccountService {
 
         let user_id = AppUserRepository::create_app_user(new_user).await?;
 
-        LeagueRepository::create_app_user(13, user_id).await?;
-        LeagueRepository::create_app_user(14, user_id).await?;
+        LeagueRepository::insert_tournament_user(13, user_id).await?;
+        LeagueRepository::insert_tournament_user(14, user_id).await?;
 
         let new_user = CreateAccountResponse {
             id: user_id as u64,
-            username: user.username,
-            email: user.email,
+            username: user.username.clone(),
+            email: user.email.clone(),
             profile_url: profile_url.to_string(),
         };
 

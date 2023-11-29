@@ -1,11 +1,12 @@
-use sqlx::Error;
+use sqlx::{Error, Row};
 
 use crate::data::data_client::DataClient;
+use crate::data::models::tournament::Tournament;
 
 pub struct LeagueRepository;
 
 impl LeagueRepository {
-    pub async fn create_app_user(tournament_id: i64, user_id: i64) -> Result<(), Error> {
+    pub async fn insert_tournament_user(tournament_id: i64, user_id: i64) -> Result<(), Error> {
         let pool = DataClient::connect().await?;
 
         sqlx::query(
@@ -23,6 +24,34 @@ impl LeagueRepository {
         .await?;
 
         return Ok(());
+    }
+
+    pub async fn insert_tournament(tournament: Tournament) -> Result<u64, Error> {
+        let pool = DataClient::connect().await?;
+
+        let res = sqlx::query(
+            "
+            INSERT INTO
+                tournament
+            (competition_id, name, tournament_type_id, is_private, passcode, commissioner_id)
+            VALUES 
+                ($1, $2, $3, $4::bit, $5, $6)
+            RETURNING
+                id
+            ",
+        )
+        .bind(tournament.competition_id as i64)
+        .bind(tournament.name)
+        .bind(tournament.tournament_type_id as i64)
+        .bind(if tournament.is_private { "1" } else { "0" })
+        .bind(tournament.passcode)
+        .bind(tournament.commissioner_id as i64)
+        .fetch_one(&pool)
+        .await?;
+
+        let id = res.get::<i64, _>("id") as u64;
+
+        return Ok(id);
     }
 
     //     pub async fn fetch_leagues_by_user_id(user_id: u64) -> Result<Vec<TournamentUsers>, Error> {

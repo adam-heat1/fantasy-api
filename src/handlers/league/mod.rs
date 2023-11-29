@@ -1,3 +1,3 @@
 pub mod handlers;
 pub mod request_models;
-mod response_models;
+pub mod response_models;
