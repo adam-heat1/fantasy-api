@@ -1,3 +1,4 @@
+use crate::handlers::league::response_models::OpenLeagueResponse;
 use crate::repositories::league::LeagueRepository;
 use crate::{
     data::models::tournament::Tournament,
@@ -8,6 +9,12 @@ use sqlx::Error;
 pub struct LeagueService;
 
 impl LeagueService {
+    pub async fn get_open_leagues(
+        competition_id: &u64,
+        user_id: &u64,
+    ) -> Result<Vec<OpenLeagueResponse>, Error> {
+        LeagueRepository::fetch_open_leagues(competition_id, user_id).await
+    }
     pub async fn create_league(league: &CreateLeague) -> Result<CreateLeagueResponse, Error> {
         let new_league = Tournament {
             id: 0,
@@ -15,7 +22,6 @@ impl LeagueService {
             name: league.name.clone(),
             logo: None,
             tournament_type_id: league.tournament_type_id,
-            locked_events: 0,
             is_private: league.is_private,
             passcode: league.passcode.clone(),
             commissioner_id: league.user_id,

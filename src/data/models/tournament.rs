@@ -8,7 +8,6 @@ pub struct Tournament {
     pub name: String,
     pub logo: Option<String>,
     pub tournament_type_id: u64,
-    pub locked_events: u64,
     pub is_private: bool,
     pub passcode: Option<String>,
     pub commissioner_id: u64,

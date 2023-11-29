@@ -10,6 +10,7 @@ pub struct Competition {
     pub logo: String,
     pub region_id: u64,
     pub sort_order: u64,
+    pub locked_events: u64,
 
     pub region: Option<Region>,
 }

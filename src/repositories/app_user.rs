@@ -36,7 +36,6 @@ impl AppUserRepository {
         let res = sqlx::query(
             "
             SELECT
-                id,
                 username
             FROM
                 app_user
