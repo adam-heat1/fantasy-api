@@ -1,16 +1,15 @@
-name: "ci"
-
+name: Pulumi Deploy
 on:
   push:
     branches:
       - main
-
 jobs:
-  dagger:
+  up:
+    name: Preview
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+      - uses: actions/checkout@v3
       - id: "auth"
         name: "Authenticate to Google Cloud"
         uses: "google-github-actions/auth@v1"
@@ -23,19 +22,10 @@ jobs:
           registry: gcr.io
           username: oauth2accesstoken
           password: ${{ steps.auth.outputs.access_token }}
-      - name: Setup Go
-        uses: actions/setup-go@v4
+      - run: go mod download
+      - uses: pulumi/actions@v4
         with:
-          go-version: ">=1.20"
-      - name: Install
-        run: go get dagger.io/dagger@latest cloud.google.com/go/run/apiv2
-      - name: Install Dagger CLI
-        run: cd /usr/local && { curl -L https://dl.dagger.io/dagger/install.sh | sh; cd -; }
-      - name: Setup Artifact Registry
-        run: gcloud auth configure-docker us-central1-docker.pkg.dev
-      - name: Release and deploy with Dagger
-        run: dagger run go run ci/main.go
+          command: preview
+          stack-name: heat1-fantasy-api/production
         env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          NTFY_UNKNOWN_MEDIA: ${{ secrets.NTFY_UNKNOWN_MEDIA }}
-          NTFY_UNKNOWN_ERROR: ${{ secrets.NTFY_UNKNOWN_ERROR }}
+          PULUMI_ACCESS_TOKEN: ${{ secrets.PULUMI_ACCESS_TOKEN }}
