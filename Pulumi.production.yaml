@@ -1,0 +1,16 @@
+config:
+  app:name: fantasy-rust-api
+  gcp:project: fantasy-app-403821
+  gcp:region: us-central1
+  heat1-fantasy-api:apiDomain: api.heat1.app
+  heat1-fantasy-api:appName: fantasy-rust-api
+  heat1-fantasy-api:databaseName: heat1-instance
+  heat1-fantasy-api:databaseUrl:
+    secure: AAABADawAZojpiB3OGh+MjGfyJKOat3VzS6qteSThdKscT7c2TSTEOxawJD2eLWMrCNLKELpVIFxMUCjJXa+zgNFspkzHqwmoUFmB6Fld4zt+3WtfNH3anYZJDhImRut7lZ00rhWN+Nj9Si5lBEwrSJkz3M2BLfPV8j9aRPrxRyFtLHwp2PJBSPN3YMYKBCVeY8RXWAVTcwMroJ4Dwx3xXm6PUek25HnXw==
+  heat1-fantasy-api:ntfyUnknownError:
+    secure: AAABAORuURlxvAQ3V+LPdxIWPlbzzgpVwZgBj+D86SBcl13qQthvRwP2jY5jlPO9n8wBBIhBNWFHf9sh6sjw9MdzPRAW
+  heat1-fantasy-api:ntfyUnknownMedia:
+    secure: AAABALn1PTap//T28h/0///dv7nlXxnGxHT+h0NkQn5l03NrJYKgjbpBrskw9h/aFNZ9EtyIWWEXgSmCc4/aMaJv+HpH4e41YbdKZI4=
+  heat1-fantasy-api:projectId:
+    secure: AAABAAHCi5d8WVaLInMqEEolXYx3VcoRAY8iayg2VQmKK0gG9F97hNyD8vYCtlMXW6I=
+  heat1-fantasy-api:region: us-central1

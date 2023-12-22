@@ -15,3 +15,4 @@ pub mod tournament_type;
 pub mod tournament_user_picks;
 pub mod tournament_users;
 pub mod tournament_workouts;
+pub mod workout;

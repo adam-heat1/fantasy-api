@@ -1,3 +1,4 @@
+use crate::handlers::account::response_models::GetAccountResponse;
 use crate::{
     data::models::app_user::AppUser,
     handlers::account::{
@@ -59,14 +60,14 @@ impl AccountService {
         Ok(new_user)
     }
 
-    pub async fn get_user_by_firebase_id(firebase_id: String) -> Result<AppUser, Error> {
-        let user = AppUserRepository::fetch_user_by_firebase_id(firebase_id).await?;
+    pub async fn get_user_by_firebase_id(firebase_id: &str) -> Result<GetAccountResponse, Error> {
+        let user = AppUserRepository::fetch_user_by_firebase_id(firebase_id.to_string()).await?;
 
         Ok(user)
     }
 
-    pub async fn get_user_by_user_id(user_id: u64) -> Result<AppUser, Error> {
-        let user = AppUserRepository::fetch_user_by_user_id(user_id).await?;
+    pub async fn get_user_by_user_id(user_id: &u64) -> Result<GetAccountResponse, Error> {
+        let user = AppUserRepository::fetch_user_by_user_id(*user_id).await?;
 
         Ok(user)
     }

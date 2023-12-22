@@ -1,5 +1,5 @@
 # Rust as the base image
-FROM rust:1.73
+FROM rust:1.74 as build
 
 # 1. Create a new empty shell project
 RUN USER=root cargo new --bin fantasy-api
@@ -18,6 +18,10 @@ COPY ./src ./src
 
 # 5. Build for release.
 RUN rm ./target/release/deps/fantasy_api*
-RUN cargo install --path .
+RUN cargo build --release
 
-CMD ["fantasy-api"]
+FROM rust:1.74
+
+COPY --from=build /fantasy-api/target/release/fantasy-api .
+
+CMD ["./fantasy-api"]

@@ -1,4 +1,4 @@
-package main
+package dagger
 
 import (
 	"context"
@@ -15,7 +15,7 @@ const APP_NAME = "fantasy-api"
 const GCR_SERVICE_URL = "projects/" + PROJECT_ID + "/locations/us-central1/services/" + APP_NAME
 const GAR_PUBLISH_ADDRESS = "us-central1-docker.pkg.dev/" + PROJECT_ID + "/" + APP_NAME + "/api"
 
-func main() {
+func ci() {
 	// create Dagger client
 	ctx := context.Background()
 	daggerClient, err := dagger.Connect(ctx, dagger.WithLogOutput(os.Stderr))
@@ -96,6 +96,7 @@ func main() {
 					MinInstanceCount: 0,
 					MaxInstanceCount: 1,
 				},
+				ServiceAccount: "fantasy-api-gcr@fantasy-app-403821.iam.gserviceaccount.com",
 			},
 		},
 	}

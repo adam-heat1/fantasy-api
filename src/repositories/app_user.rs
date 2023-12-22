@@ -1,5 +1,6 @@
 use sqlx::{Error, Row};
 
+use crate::handlers::account::response_models::GetAccountResponse;
 use crate::{
     data::{data_client::DataClient, models::app_user::AppUser},
     handlers::account::request_models::UpdateUsername,
@@ -104,7 +105,9 @@ impl AppUserRepository {
         return Ok(id);
     }
 
-    pub async fn fetch_user_by_firebase_id(firebase_id: String) -> Result<AppUser, Error> {
+    pub async fn fetch_user_by_firebase_id(
+        firebase_id: String,
+    ) -> Result<GetAccountResponse, Error> {
         let pool = DataClient::connect().await?;
 
         let res = sqlx::query(
@@ -125,19 +128,17 @@ impl AppUserRepository {
         .fetch_one(&pool)
         .await?;
 
-        let user = AppUser {
+        let user = GetAccountResponse {
             id: res.get::<i64, _>("id") as u64,
             username: res.get("username"),
-            firebase_id: res.get("firebase_id"),
             email: res.get("email"),
             profile_url: res.get("profile_url"),
-            leagues: None,
         };
 
         return Ok(user);
     }
 
-    pub async fn fetch_user_by_user_id(user_id: u64) -> Result<AppUser, Error> {
+    pub async fn fetch_user_by_user_id(user_id: u64) -> Result<GetAccountResponse, Error> {
         let pool = DataClient::connect().await?;
 
         let res = sqlx::query(
@@ -145,7 +146,6 @@ impl AppUserRepository {
             SELECT 
                 id,
                 username,
-                firebase_id,
                 email,
                 profile_url
             FROM 
@@ -158,13 +158,11 @@ impl AppUserRepository {
         .fetch_one(&pool)
         .await?;
 
-        let user = AppUser {
+        let user = GetAccountResponse {
             id: res.get::<i64, _>("id") as u64,
             username: res.get("username"),
-            firebase_id: res.get("firebase_id"),
             email: res.get("email"),
             profile_url: res.get("profile_url"),
-            leagues: None,
         };
 
         return Ok(user);

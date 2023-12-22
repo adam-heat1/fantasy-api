@@ -1,12 +1,13 @@
+use crate::handlers::account::request_models::GetFirebaseUserRequest;
 use crate::{
     data::constants::ntfy,
-    handlers::account::request_models::{CreateAccount, UpdateUsername, Username},
+    handlers::account::request_models::{CreateAccount, GetUserRequest, UpdateUsername, Username},
     services::account::AccountService,
     utils::notification::spawn_notification,
 };
 use actix_web::{
     get, post, put,
-    web::{Json, Query, ServiceConfig},
+    web::{Json, Path, Query, ServiceConfig},
     HttpResponse, Responder,
 };
 use serde_json::json;
@@ -15,9 +16,55 @@ use validator::Validate;
 pub fn configure(config: &mut ServiceConfig) {
     config
         .service(get_email_by_username)
+        .service(get_user)
+        .service(get_firebase_user)
         .service(validate_new_username)
         .service(update_username)
         .service(create_account);
+}
+
+#[get("/firebase/{firebaseId}")]
+pub(crate) async fn get_firebase_user(path: Path<GetFirebaseUserRequest>) -> impl Responder {
+    let firebase_id = &path.firebase_id;
+    AccountService::get_user_by_firebase_id(firebase_id)
+        .await
+        .map_or_else(
+            |e| {
+                if e.to_string().to_lowercase().contains("no rows returned") {
+                    return HttpResponse::NotFound().body("No user found with that firebase id");
+                }
+                let error_message = format!(
+                    "Error fetching user by firebase id: {}: -> {:?}",
+                    firebase_id, e
+                );
+                spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+                HttpResponse::InternalServerError().body("Error fetching user by firebase id")
+            },
+            |user| HttpResponse::Ok().json(json!(user)),
+        )
+}
+
+#[get("/user/{userId}")]
+pub(crate) async fn get_user(path: Path<GetUserRequest>) -> impl Responder {
+    let user_id = &path.user_id;
+    AccountService::get_user_by_user_id(user_id)
+        .await
+        .map_or_else(
+            |e| {
+                if e.to_string().to_lowercase().contains("no rows returned") {
+                    return HttpResponse::NotFound().body("No user found with that user id");
+                }
+                let error_message = format!(
+                    "Error fetching user by firebase id: {}: -> {:?}",
+                    user_id, e
+                );
+                spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+                HttpResponse::InternalServerError().body("Error fetching user by user id")
+            },
+            |user| HttpResponse::Ok().json(json!(user)),
+        )
 }
 
 #[get("/email")]

@@ -1,5 +1,7 @@
 {
     "cSpell.words": [
+        "cloudrun",
+        "pulumi",
         "runpb",
         "sqlx"
     ]

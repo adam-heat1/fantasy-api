@@ -24,3 +24,15 @@ pub struct CreateAccount {
     #[validate(email)]
     pub email: String,
 }
+
+#[derive(Deserialize, Validate, Clone, Debug)]
+pub struct GetFirebaseUserRequest {
+    #[serde(rename = "firebaseId")]
+    pub firebase_id: String,
+}
+
+#[derive(Deserialize, Validate, Clone, Debug)]
+pub struct GetUserRequest {
+    #[serde(rename = "userId")]
+    pub user_id: u64,
+}
