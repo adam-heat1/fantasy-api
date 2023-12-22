@@ -22,7 +22,7 @@ jobs:
           registry: gcr.io
           username: oauth2accesstoken
           password: ${{ steps.auth.outputs.access_token }}
-      - run: go mod download
+      # - run: go mod download
       - uses: pulumi/actions@v4
         with:
           command: preview
