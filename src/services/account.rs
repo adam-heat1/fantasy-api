@@ -8,6 +8,7 @@ use crate::{
     repositories::{app_user::AppUserRepository, league::LeagueRepository},
 };
 use sqlx::Error;
+use tokio::join;
 
 pub struct AccountService;
 
@@ -47,8 +48,12 @@ impl AccountService {
 
         let user_id = AppUserRepository::create_app_user(new_user).await?;
 
-        LeagueRepository::insert_tournament_user(13, user_id).await?;
-        LeagueRepository::insert_tournament_user(14, user_id).await?;
+        join!(
+            LeagueRepository::insert_tournament_user(304, user_id),
+            LeagueRepository::insert_tournament_user(305, user_id),
+            LeagueRepository::insert_tournament_user(306, user_id),
+            LeagueRepository::insert_tournament_user(307, user_id)
+        );
 
         let new_user = CreateAccountResponse {
             id: user_id as u64,

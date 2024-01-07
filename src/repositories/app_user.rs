@@ -87,9 +87,9 @@ impl AppUserRepository {
             "
             INSERT INTO
                 app_user
-            (username, firebase_id, email) 
+            (username, firebase_id, email, profile_url) 
             VALUES 
-                ($1, $2, $3)
+                ($1, $2, $3, $4)
             RETURNING
                 id
             ",
@@ -97,6 +97,7 @@ impl AppUserRepository {
         .bind(user.username.trim())
         .bind(user.firebase_id.clone().trim())
         .bind(user.email.clone().trim())
+        .bind(user.profile_url.clone().trim())
         .fetch_one(&pool)
         .await?;
 

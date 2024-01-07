@@ -16,3 +16,5 @@ pub mod tournament_user_picks;
 pub mod tournament_users;
 pub mod tournament_workouts;
 pub mod workout;
+pub mod workout_stage_movement;
+pub mod workout_stages;

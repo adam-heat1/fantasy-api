@@ -1,5 +1,8 @@
 use crate::data::models::workout::Workout;
-use crate::handlers::league::response_models::{LeaderboardPicks, LeaderboardScores};
+use crate::handlers::league::response_models::{
+    CompetitionLeaderboardResponse, LeaderboardPicks, LeaderboardScores,
+    WorkoutPredictionCountResponse, WorkoutPredictionResponse,
+};
 use crate::{
     data::{data_client::DataClient, models::tournament::Tournament},
     handlers::league::{
@@ -7,13 +10,17 @@ use crate::{
         response_models::{
             LeaderboardMetadataData, LeaderboardScoreData, LeaderboardShotCallerScoreData,
             LeaderboardTop10ScoreData, LeaderboardTournamentUserData, LeagueAthletesResponse,
-            OpenLeagueResponse, UserLeaguesPicksDataResponse, UserLeaguesResponse,
+            OpenLeagueResponse, UserLeagueTournamentCompetitionStatus,
+            UserLeaguesPicksDataResponse, UserLeaguesResponse,
         },
     },
 };
 
+use crate::data::models::workout_stage_movement::WorkoutStageMovement;
+use crate::data::models::workout_stages::WorkoutStages;
 use sqlx::{Error, Row};
 use std::collections::HashMap;
+use std::hash::Hash;
 
 pub struct LeagueRepository;
 
@@ -21,9 +28,6 @@ pub struct LeagueRepository;
 #[sqlx(transparent, no_pg_array)]
 struct Picks(Vec<(i64, i64, i64)>);
 
-#[derive(sqlx::Type)]
-#[sqlx(transparent, no_pg_array)]
-struct Scores(Vec<(i64, f64, i64)>);
 impl LeagueRepository {
     pub async fn fetch_competition(tournament_id: i64) -> Result<LeaderboardMetadataData, Error> {
         let pool = DataClient::connect().await?;
@@ -55,6 +59,148 @@ impl LeagueRepository {
             tournament_name: row.get("tournament_name"),
             tournament_type_id: row.get::<i64, _>("tournament_type_id") as u64,
         })
+        .fetch_one(&pool)
+        .await?;
+
+        return Ok(res);
+    }
+
+    pub async fn fetch_workout_prediction_count(
+        competition_id: i64,
+        ordinal: i64,
+    ) -> Result<HashMap<i64, i64>, Error> {
+        let pool = DataClient::connect().await?;
+
+        let res = sqlx::query(
+            "
+            SELECT
+                gender_id,
+                COUNT(*) as count
+            FROM 
+                tournament_user_picks
+            JOIN
+                tournament_users
+                ON tournament_users.id = tournament_user_picks.tournament_user_id
+            JOIN
+                tournament
+                ON tournament.id = tournament_users.tournament_id
+            JOIN
+                competitor
+                ON competitor.id = tournament_user_picks.competitor_id
+            WHERE
+                tournament.competition_id = $1
+                AND tournament_user_picks.rank = $2
+                AND tournament.tournament_type_id = 2
+            GROUP BY gender_id
+            ",
+        )
+        .bind(competition_id)
+        .bind(ordinal)
+        .map(
+            |row: sqlx::postgres::PgRow| WorkoutPredictionCountResponse {
+                gender_id: row.get("gender_id"),
+                count: row.get("count"),
+            },
+        )
+        .fetch_all(&pool)
+        .await?;
+
+        let result_map = res.into_iter().map(|s| (s.gender_id, s.count)).collect();
+
+        return Ok(result_map);
+    }
+
+    pub async fn fetch_workout_picks(
+        competition_id: i64,
+        ordinal: i64,
+        men_picks: i64,
+        women_picks: i64,
+    ) -> Result<Vec<WorkoutPredictionResponse>, Error> {
+        let pool = DataClient::connect().await?;
+
+        let res = sqlx::query(
+            "
+            SELECT
+                CONCAT(competitor.first_name, ' ', competitor.last_name) as competitor,
+                COUNT(*) as picks,
+                competitor.gender_id
+            FROM 
+                tournament_user_picks
+            JOIN
+                tournament_users
+                ON tournament_users.id = tournament_user_picks.tournament_user_id
+            JOIN
+                tournament
+                ON tournament.id = tournament_users.tournament_id
+            JOIN
+                competitor
+                ON competitor.id = tournament_user_picks.competitor_id
+            WHERE
+                tournament.competition_id = $1
+                AND tournament_user_picks.rank = $2
+                AND tournament.tournament_type_id = 2
+            GROUP BY
+                gender_id,
+                competitor.first_name,
+                competitor.last_name
+            ",
+        )
+        .bind(competition_id)
+        .bind(ordinal)
+        .map(|row: sqlx::postgres::PgRow| {
+            let picks = row.get("picks");
+            let gender_id = row.get::<i64, _>("gender_id");
+            let denominator = if gender_id == 1 {
+                men_picks
+            } else {
+                women_picks
+            };
+            WorkoutPredictionResponse {
+                competitor: row.get("competitor"),
+                picks,
+                gender_id,
+                percentile: (picks as f64) / (denominator as f64) * 100.0,
+            }
+        })
+        .fetch_all(&pool)
+        .await?;
+
+        return Ok(res);
+    }
+
+    pub async fn fetch_competition_tournament_status(
+        user_tournament_id: i64,
+    ) -> Result<UserLeagueTournamentCompetitionStatus, Error> {
+        let pool = DataClient::connect().await?;
+
+        let res = sqlx::query(
+            "
+            SELECT
+                tournament.tournament_type_id,
+                competition.locked_events,
+                competition.is_active,
+                competition.is_complete 
+            FROM 
+                competition
+            JOIN
+                tournament
+                ON tournament.competition_id = competition.id
+            JOIN
+                tournament_users
+                ON tournament_users.tournament_id = tournament.id
+            WHERE
+                tournament_users.id = $1
+            ",
+        )
+        .bind(user_tournament_id)
+        .map(
+            |row: sqlx::postgres::PgRow| UserLeagueTournamentCompetitionStatus {
+                is_active: row.get("is_active"),
+                is_complete: row.get("is_complete"),
+                tournament_type_id: row.get("tournament_type_id"),
+                locked_events: row.get("locked_events"),
+            },
+        )
         .fetch_one(&pool)
         .await?;
 
@@ -98,6 +244,78 @@ impl LeagueRepository {
         Ok(res)
     }
 
+    pub async fn fetch_workout_stages(competition_id: i64) -> Result<Vec<WorkoutStages>, Error> {
+        let pool = DataClient::connect().await?;
+
+        let res = sqlx::query(
+            "
+            SELECT
+                ws.id,
+                ws.workout_id,
+                ws.ordinal,
+                ws.time_cap,
+                ws.stage_type
+            FROM 
+                workout_stages as ws
+            JOIN
+                workouts as w
+                ON w.id = ws.workout_id
+            WHERE
+                w.competition_id = $1
+            ORDER BY ws.ordinal ASC
+            ",
+        )
+        .bind(competition_id)
+        .map(|row: sqlx::postgres::PgRow| WorkoutStages {
+            id: row.get("id"),
+            workout_id: row.get("workout_id"),
+            ordinal: row.get("ordinal"),
+            time_cap: row.get("time_cap"),
+            stage_type: row.get("stage_type"),
+        })
+        .fetch_all(&pool)
+        .await?;
+
+        Ok(res)
+    }
+
+    pub async fn fetch_workout_stage_movements(
+        competition_id: i64,
+    ) -> Result<Vec<WorkoutStageMovement>, Error> {
+        let pool = DataClient::connect().await?;
+
+        let res = sqlx::query(
+            "
+            SELECT
+                wsm.id,
+                wsm.workout_stage_id,
+                wsm.ordinal,
+                wsm.name
+            FROM 
+                workout_stage_movement as wsm
+            JOIN
+                workout_stages as ws
+                ON ws.id = wsm.workout_stage_id
+            JOIN
+                workouts as w
+                ON w.id = ws.workout_id
+            WHERE
+                w.competition_id = $1
+            ",
+        )
+        .bind(competition_id)
+        .map(|row: sqlx::postgres::PgRow| WorkoutStageMovement {
+            id: row.get("id"),
+            workout_stage_id: row.get("workout_stage_id"),
+            ordinal: row.get("ordinal"),
+            name: row.get("name"),
+        })
+        .fetch_all(&pool)
+        .await?;
+
+        Ok(res)
+    }
+
     pub async fn fetch_user_tournament_competition_id(
         tournament_user_id: &i64,
     ) -> Result<i64, Error> {
@@ -127,41 +345,50 @@ impl LeagueRepository {
         return Ok(res);
     }
 
-    pub async fn fetch_scores(
-        competition_id: u64,
+    pub async fn fetch_competition_leaderboard(
+        competition_id: i64,
         gender_id: i64,
-    ) -> Result<HashMap<u64, LeaderboardScoreData>, Error> {
+    ) -> Result<HashMap<i64, CompetitionLeaderboardResponse>, Error> {
         let pool = DataClient::connect().await?;
 
         let res = sqlx::query(
             "
             SELECT
-                score.points,
-                score.ordinal,
-                score.rank,
-                score.competitor_id
+                competitor.id as competitor_id,
+                competitor.gender_id,
+                competitor.first_name,
+                competitor.last_name,
+                COALESCE(points, 0) as points,
+                ordinal_finishes,
+                COALESCE(placement, 0) as placement
             FROM 
-                score
+                competition_competitor
             JOIN
                 competitor
-                ON score.competitor_id = competitor.id
+                ON competitor.id = competition_competitor.competitor_id
+            LEFT JOIN
+                competition_leaderboard
+                ON competitor.id = competition_leaderboard.competitor_id
+                AND competition_leaderboard.competition_id = $1
             WHERE
-                score.competition_id = $1
+                competition_competitor.competition_id = $1
                 AND competitor.gender_id = $2
             ",
         )
-        .bind(competition_id as i64)
+        .bind(competition_id)
         .bind(gender_id)
-        .map(|row: sqlx::postgres::PgRow| {
-            let points = row.get::<Option<f64>, _>("points");
-            LeaderboardScoreData {
-                points,
-                ordinal: row.get::<i64, _>("ordinal") as u64,
-                rank: row.get::<i64, _>("rank") as u64,
-                competitor_id: row.get::<i64, _>("competitor_id") as u64,
-                gender_id: gender_id as u64,
-            }
-        })
+        .map(
+            |row: sqlx::postgres::PgRow| CompetitionLeaderboardResponse {
+                competitor_id: row.get("competitor_id"),
+                competition_id,
+                gender_id: row.get("gender_id"),
+                first_name: row.get("first_name"),
+                last_name: row.get("last_name"),
+                points: row.get("points"),
+                finishes: row.try_get("ordinal_finishes").unwrap_or(vec![]),
+                placement: row.get("placement"),
+            },
+        )
         .fetch_all(&pool)
         .await?;
 
@@ -170,91 +397,67 @@ impl LeagueRepository {
         return Ok(result_map);
     }
 
-    pub async fn fetch_shot_caller_scores(
-        competition_id: u64,
-    ) -> Result<Vec<LeaderboardShotCallerScoreData>, Error> {
+    pub async fn fetch_matchup_users(
+        tournament_id: i64,
+        user_id: i64,
+        competitor_id: i64,
+    ) -> Result<Vec<LeaderboardTournamentUserData>, Error> {
         let pool = DataClient::connect().await?;
 
         let res = sqlx::query(
             "
             SELECT
-                s.competitor_id,
-                ARRAY_AGG((s.ordinal, s.points, c.gender_id)) as scores
+                tu.id as tournament_user_id,
+                tu.display_name,
+                au.profile_url,
+                au.username,
+                ARRAY_AGG((tup.competitor_id, tup.rank, c.gender_id)) as picks
             FROM 
-                score as s
+                tournament_users as tu
             JOIN
+                app_user as au
+                ON tu.user_id = au.id
+            LEFT JOIN
+                tournament_user_picks as tup
+                ON tup.tournament_user_id = tu.id
+            LEFT JOIN
                 competitor as c
-                ON s.competitor_id = c.id
+                ON c.id = tup.competitor_id
             WHERE
-                s.competition_id = $1
+                tu.tournament_id = $1
+                AND (tu.id = $2 OR tu.id = $3)
             GROUP BY
-                s.competitor_id
+                tu.id,
+                tu.display_name,
+                au.profile_url,
+                au.username
             ",
         )
-        .bind(competition_id as i64)
+        .bind(tournament_id)
+        .bind(user_id)
+        .bind(competitor_id)
         .map(|row: sqlx::postgres::PgRow| {
-            let scores = row
-                .try_get::<Scores, _>("scores")
-                .unwrap_or(Scores(vec![]))
-                .0;
-            let men_scores = scores
-                .iter()
-                .filter(|p| p.2 == 1)
-                .map(|p| LeaderboardScores {
-                    ordinal: p.0,
-                    points: p.1,
-                })
-                .collect::<Vec<LeaderboardScores>>();
-            LeaderboardShotCallerScoreData {
-                men_competitors: men_scores,
-                women_competitors: scores
+            let picks = row.try_get::<Picks, _>("picks").unwrap_or(Picks(vec![])).0;
+            LeaderboardTournamentUserData {
+                tournament_user_id: row.get::<i64, _>("tournament_user_id") as u64,
+                display_name: "".to_string(),
+                avatar: "".to_string(),
+                men_competitor_ids: picks
                     .iter()
                     .filter(|p| p.2 == 1)
-                    .map(|p| LeaderboardScores {
-                        ordinal: p.0,
-                        points: p.1,
+                    .map(|p| LeaderboardPicks {
+                        competitor_id: p.0,
+                        rank: p.1,
                     })
-                    .collect::<Vec<LeaderboardScores>>(),
-                competitor_id: row.get::<i64, _>("competitor_id") as u64,
-            }
-        })
-        .fetch_all(&pool)
-        .await?;
-
-        return Ok(res);
-    }
-
-    pub async fn fetch_top_10_scores(
-        competition_id: u64,
-        gender_id: i64,
-    ) -> Result<Vec<LeaderboardTop10ScoreData>, Error> {
-        let pool = DataClient::connect().await?;
-
-        let res = sqlx::query(
-            "
-            SELECT
-                SUM(score.points) as points,
-                score.competitor_id
-            FROM 
-                score
-            JOIN
-                competitor
-                ON score.competitor_id = competitor.id
-            WHERE
-                score.competition_id = $1
-                AND competitor.gender_id = $2
-            GROUP BY
-                score.competitor_id
-            ",
-        )
-        .bind(competition_id as i64)
-        .bind(gender_id)
-        .map(|row: sqlx::postgres::PgRow| {
-            let points = row.get::<Option<f64>, _>("points");
-            LeaderboardTop10ScoreData {
-                points,
-                rank: 0,
-                competitor_id: row.get::<i64, _>("competitor_id") as u64,
+                    .collect::<Vec<LeaderboardPicks>>(),
+                women_competitor_ids: picks
+                    .iter()
+                    .filter(|p| p.2 == 2)
+                    .map(|p| LeaderboardPicks {
+                        competitor_id: p.0,
+                        rank: p.1,
+                    })
+                    .collect::<Vec<LeaderboardPicks>>(),
             }
         })
         .fetch_all(&pool)
@@ -300,14 +503,7 @@ impl LeagueRepository {
         .map(|row: sqlx::postgres::PgRow| {
             let display_name = row.get::<Option<String>, _>("display_name");
             let picks = row.try_get::<Picks, _>("picks").unwrap_or(Picks(vec![])).0;
-            let men_picks = picks
-                .iter()
-                .filter(|p| p.2 == 1)
-                .map(|p| LeaderboardPicks {
-                    competitor_id: p.0,
-                    rank: p.1,
-                })
-                .collect::<Vec<LeaderboardPicks>>();
+
             LeaderboardTournamentUserData {
                 tournament_user_id: row.get::<i64, _>("tournament_user_id") as u64,
                 display_name: if display_name.is_some() {
@@ -316,7 +512,14 @@ impl LeagueRepository {
                     row.get("username")
                 },
                 avatar: row.get("profile_url"),
-                men_competitor_ids: men_picks,
+                men_competitor_ids: picks
+                    .iter()
+                    .filter(|p| p.2 == 1)
+                    .map(|p| LeaderboardPicks {
+                        competitor_id: p.0,
+                        rank: p.1,
+                    })
+                    .collect::<Vec<LeaderboardPicks>>(),
                 women_competitor_ids: picks
                     .iter()
                     .filter(|p| p.2 == 2)
@@ -368,25 +571,17 @@ impl LeagueRepository {
             ",
         )
         .bind(competition_id as i64)
-        .map(|row: sqlx::postgres::PgRow| {
-            let ww_rank = row.get::<Option<i64>, _>("ww_rank");
-            // let adp = row.get::<f64, _>("adp");
-            LeagueAthletesResponse {
-                competitor_id: row.get::<i64, _>("competitor_id") as u64,
-                gender_id: row.get::<i64, _>("gender_id") as u64,
-                first_name: row.get("first_name"),
-                last_name: row.get("last_name"),
-                ww_rank: if ww_rank.is_some() {
-                    Some(ww_rank.unwrap() as u64)
-                } else {
-                    Some(0)
-                },
-                adp: Some(0.1),
-                is_locked: row.get("is_active") || row.get("is_complete"),
-                is_withdrawn: row.get("is_withdrawn"),
-                is_cut: row.get("is_cut"),
-                is_suspended: row.get("is_suspended"),
-            }
+        .map(|row: sqlx::postgres::PgRow| LeagueAthletesResponse {
+            competitor_id: row.get::<i64, _>("competitor_id") as u64,
+            gender_id: row.get::<i64, _>("gender_id") as u64,
+            first_name: row.get("first_name"),
+            last_name: row.get("last_name"),
+            ww_rank: row.get::<Option<i64>, _>("ww_rank"),
+            adp: row.get::<f64, _>("adp"),
+            is_locked: row.get("is_active") || row.get("is_complete"),
+            is_withdrawn: row.get("is_withdrawn"),
+            is_cut: row.get("is_cut"),
+            is_suspended: row.get("is_suspended"),
         })
         .fetch_all(&pool)
         .await?;
@@ -423,6 +618,7 @@ impl LeagueRepository {
                 ON competition.id = tournament.competition_id 
             WHERE
                 tournament_users.user_id = $1
+                AND competition.id > 12
             ",
         )
         .bind(user_league.user_id)
@@ -453,6 +649,7 @@ impl LeagueRepository {
         let res = sqlx::query(
             "
             SELECT
+                tournament_user_picks.id,
                 tournament_user_picks.competitor_id,
                 tournament_user_picks.rank,
                 competitor.gender_id
@@ -465,8 +662,9 @@ impl LeagueRepository {
                 tournament_user_picks.tournament_user_id = $1
             ",
         )
-        .bind(*tournament_user_id as i64)
+        .bind(*tournament_user_id)
         .map(|row: sqlx::postgres::PgRow| UserLeaguesPicksDataResponse {
+            id: row.get("id"),
             competitor_id: row.get::<i64, _>("competitor_id") as u64,
             rank: row.get::<i64, _>("rank") as u64,
             gender_id: row.get::<i64, _>("gender_id") as u64,
@@ -487,7 +685,7 @@ impl LeagueRepository {
             FROM
                 tournament_users
             WHERE
-                id = $1
+                tournament_id = $1
                 AND user_id = $2
             ",
         )
@@ -543,6 +741,7 @@ impl LeagueRepository {
 
         return Ok(res);
     }
+
     pub async fn insert_tournament_user(tournament_id: i64, user_id: i64) -> Result<(), Error> {
         let pool = DataClient::connect().await?;
 
@@ -554,6 +753,45 @@ impl LeagueRepository {
         )
         .bind(tournament_id)
         .bind(user_id)
+        .execute(&pool)
+        .await?;
+
+        return Ok(());
+    }
+
+    pub async fn delete_user_league_pick(tournament_user_pick_id: i64) -> Result<(), Error> {
+        let pool = DataClient::connect().await?;
+
+        let _ = sqlx::query(
+            "
+            DELETE FROM tournament_user_picks
+            WHERE id = $1
+            ",
+        )
+        .bind(tournament_user_pick_id)
+        .execute(&pool)
+        .await?;
+
+        return Ok(());
+    }
+
+    pub async fn insert_user_league_pick(
+        tournament_user_id: i64,
+        competitor_id: i64,
+        rank: i64,
+    ) -> Result<(), Error> {
+        let pool = DataClient::connect().await?;
+
+        sqlx::query(
+            "
+            INSERT INTO tournament_user_picks (tournament_user_id, competitor_id, rank, last_updated) 
+            VALUES ($1, $2, $3, $4)
+            ",
+        )
+        .bind(tournament_user_id)
+        .bind(competitor_id)
+        .bind(rank)
+         .bind(format!("{}", chrono::Utc::now()))
         .execute(&pool)
         .await?;
 
@@ -588,71 +826,178 @@ impl LeagueRepository {
         return Ok(id);
     }
 
-    //     pub async fn fetch_leagues_by_user_id(user_id: u64) -> Result<Vec<TournamentUsers>, Error> {
-    //         let pool = DataClient::connect().await?;
+    pub async fn fetch_competition_competitor_ids(
+        competition_id: i64,
+        gender_id: i64,
+    ) -> Result<Vec<i64>, Error> {
+        let pool = DataClient::connect().await?;
 
-    //         let res = sqlx::query(
-    //             "
-    //             SELECT
-    //                 tournament_users.id as tournament_users_id,
-    //                 tournament_users.display_name,
-    //                 tournament.id as tournament_id,
-    //                 tournament.name as tournament_name,
-    //                 tournament.logo,
-    //                 tournament.tournament_type_id,
-    //                 competition.id as competition_id,
-    //                 competition.name as competition_name,
-    //                 competition.is_active,
-    //                 competition.is_complete,
-    //                 competition.logo,
-    //                 competition.region_id,
-    //                 competition.sort_order
-    //             FROM
-    //                 tournament_users
-    //             JOIN
-    //                 tournament on tournament_users.tournament_id = tournament.id
-    //             JOIN
-    //                 competition on tournament.competition_id = competition.id
-    //             WHERE
-    //                 user_id = $1
-    //             ",
-    //         )
-    //         .bind(user_id as i64)
-    //         .map(|row: PgRow| {
-    //             let competition = Competition {
-    //                 id: row.get::<i64, _>("competition_id") as u64,
-    //                 name: row.get("competition_name"),
-    //                 is_active: row.get("is_active"),
-    //                 is_complete: row.get("is_complete"),
-    //                 logo: row.get("logo"),
-    //                 region_id: row.get::<i64, _>("region_id") as u64,
-    //                 sort_order: row.get::<i64, _>("sort_order") as u64,
-    //                 region: None,
-    //             };
+        let res = sqlx::query(
+            "
+            SELECT
+                competitor.id
+            FROM 
+                competition_competitor
+            JOIN
+                competitor 
+                ON competitor.id = competition_competitor.competitor_id
+            WHERE
+                competition_competitor.competition_id = $1
+                AND competitor.gender_id = $2
+            ",
+        )
+        .bind(competition_id)
+        .bind(gender_id)
+        .map(|row: sqlx::postgres::PgRow| row.get("id"))
+        .fetch_all(&pool)
+        .await?;
 
-    //             let tournament = Tournament {
-    //                 id: row.get::<i64, _>("tournament_id") as u64,
-    //                 name: row.get("competition_name"),
-    //                 logo: row.get("logo"),
-    //                 tournament_type_id: row.get::<i64, _>("tournament_type_id") as u64,
-    //                 competition_id: row.get::<i64, _>("competition_id") as u64,
-    //                 locked_events: 0,
-    //                 tournament_type: None,
-    //                 competition: Some(competition),
-    //             };
+        return Ok(res);
+    }
 
-    //             return TournamentUsers {
-    //                 id: row.get::<i64, _>("tournament_users_id") as u64,
-    //                 display_name: row.get("display_name"),
-    //                 tournament_id: row.get::<i64, _>("tournament_id") as u64,
-    //                 user_id,
-    //                 tournament,
-    //                 user: None,
-    //             };
-    //         })
-    //         .fetch_all(&pool)
-    //         .await?;
+    pub async fn fetch_competitor_pick_count(
+        competition_id: i64,
+        gender_id: i64,
+    ) -> Result<HashMap<i64, Vec<i64>>, Error> {
+        let pool = DataClient::connect().await?;
 
-    //         return Ok(res);
-    //     }
+        let res = sqlx::query(
+            "
+            SELECT
+                tournament_user_picks.competitor_id,
+                tournament_user_picks.rank
+            FROM 
+                tournament_user_picks
+            JOIN
+                tournament_users
+                ON tournament_users.id = tournament_user_picks.tournament_user_id
+            JOIN
+                tournament 
+                ON tournament.id = tournament_users.tournament_id AND tournament.competition_id = $1
+            JOIN
+                competitor
+                ON competitor.id = tournament_user_picks.competitor_id
+            WHERE
+                competitor.gender_id = $2
+                AND tournament.tournament_type_id = 1
+            ",
+        )
+        .bind(competition_id)
+        .bind(gender_id)
+        .map(|row: sqlx::postgres::PgRow| {
+            (
+                row.get::<i64, _>("competitor_id"),
+                row.get::<i64, _>("rank"),
+            )
+        })
+        .fetch_all(&pool)
+        .await?;
+
+        let mut result: HashMap<i64, Vec<i64>> = HashMap::new();
+
+        for (competitor_id, rank) in res {
+            result.entry(competitor_id).or_insert(vec![]).push(rank);
+        }
+
+        return Ok(result);
+    }
+
+    pub async fn fetch_tournament_entries(
+        competition_id: i64,
+        gender_id: i64,
+    ) -> Result<i64, Error> {
+        let pool = DataClient::connect().await?;
+
+        let res = sqlx::query(
+            "
+            SELECT
+                COUNT(DISTINCT tournament_user_id) as count
+            FROM 
+                tournament_user_picks
+            JOIN
+                tournament_users
+                ON tournament_users.id = tournament_user_picks.tournament_user_id
+            JOIN
+                tournament
+                ON tournament.id = tournament_users.tournament_id AND tournament.competition_id = $1
+            JOIN
+                competitor
+                ON competitor.id = tournament_user_picks.competitor_id
+            WHERE
+                competitor.gender_id = $2
+                AND tournament.tournament_type_id = 1
+            ",
+        )
+        .bind(competition_id)
+        .bind(gender_id)
+        .map(|row: sqlx::postgres::PgRow| row.get("count"))
+        .fetch_one(&pool)
+        .await?;
+
+        return Ok(res);
+    }
+
+    pub async fn update_competitor_adp(competitor_id: i64, adp: f64) -> Result<(), Error> {
+        let pool = DataClient::connect().await?;
+
+        let res = sqlx::query(
+            "
+            UPDATE elite_competitor
+            SET adp = $2
+            WHERE competitor_id = $1
+            ",
+        )
+        .bind(competitor_id)
+        .bind(adp)
+        .execute(&pool)
+        .await?;
+
+        return Ok(());
+    }
+
+    pub async fn update_event(
+        competition_id: i64,
+        is_active: bool,
+        ordinal: i64,
+    ) -> Result<(), Error> {
+        let pool = DataClient::connect().await?;
+
+        let _res = sqlx::query(
+            "
+            UPDATE competition
+            SET is_active = $2, locked_events = $3
+            WHERE id = $1
+            ",
+        )
+        .bind(competition_id)
+        .bind(is_active)
+        .bind(ordinal)
+        .execute(&pool)
+        .await?;
+
+        return Ok(());
+    }
+
+    pub async fn update_workout(
+        competition_id: i64,
+        is_active: bool,
+        ordinal: i64,
+    ) -> Result<(), Error> {
+        let pool = DataClient::connect().await?;
+
+        let _res = sqlx::query(
+            "
+            UPDATE workouts
+            SET is_active = $2
+            WHERE competition_id = $1 AND ordinal = $3
+            ",
+        )
+        .bind(competition_id)
+        .bind(is_active)
+        .bind(ordinal)
+        .execute(&pool)
+        .await?;
+
+        return Ok(());
+    }
 }

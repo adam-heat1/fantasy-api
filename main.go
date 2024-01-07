@@ -5,6 +5,7 @@ import (
 
 	"github.com/pulumi/pulumi-docker/sdk/v4/go/docker"
 	"github.com/pulumi/pulumi-gcp/sdk/v7/go/gcp/cloudrun"
+	"github.com/pulumi/pulumi-gcp/sdk/v7/go/gcp/cloudscheduler"
 	"github.com/pulumi/pulumi-gcp/sdk/v7/go/gcp/sql"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi"
 	"github.com/pulumi/pulumi/sdk/v3/go/pulumi/config"
@@ -70,7 +71,12 @@ func main() {
 			Name:               pulumi.String(databaseName),
 			Project:            pulumi.String(projectID),
 			Settings: &sql.DatabaseInstanceSettingsArgs{
-				Tier:                      pulumi.String("db-f1-micro"),
+				// Tier: pulumi.String("db-custom-1-3840"), // 1 vCPU, 3.75 GB RAM
+				// Tier: 					  pulumi.String("db-custom-2-7680"), // 2 vCPU, 7.5 GB RAM
+				Tier: pulumi.String("db-custom-4-15360"), // 4 vCPU, 15 GB RAM
+				// Tier:                      pulumi.String("db-custom-8-30720"),// 8 vCPU, 30 GB RAM
+				// Tier:                      pulumi.String("db-custom-16-61440"),// 16 vCPU, 60 GB RAM
+				// Tier:                      pulumi.String("db-custom-32-122880"),// 32 vCPU, 120 GB RAM
 				DeletionProtectionEnabled: pulumi.Bool(false),
 				BackupConfiguration: &sql.DatabaseInstanceSettingsBackupConfigurationArgs{
 					BackupRetentionSettings: &sql.DatabaseInstanceSettingsBackupConfigurationBackupRetentionSettingsArgs{
@@ -78,10 +84,18 @@ func main() {
 					},
 					Enabled: pulumi.Bool(true),
 				},
+				InsightsConfig: &sql.DatabaseInstanceSettingsInsightsConfigArgs{
+					QueryInsightsEnabled: pulumi.Bool(true),
+				},
 				IpConfiguration: &sql.DatabaseInstanceSettingsIpConfigurationArgs{
 					AuthorizedNetworks: &sql.DatabaseInstanceSettingsIpConfigurationAuthorizedNetworkArray{
 						&sql.DatabaseInstanceSettingsIpConfigurationAuthorizedNetworkArgs{
+							Name:  pulumi.String("Home"),
 							Value: pulumi.String("136.32.221.141"),
+						},
+						&sql.DatabaseInstanceSettingsIpConfigurationAuthorizedNetworkArgs{
+							Name:  pulumi.String("Culver Home"),
+							Value: pulumi.String("50.27.208.112"),
 						},
 					},
 				},
@@ -167,6 +181,19 @@ func main() {
 			Spec: &cloudrun.DomainMappingSpecArgs{
 				RouteName: service.Name,
 			},
+		})
+		if err != nil {
+			return err
+		}
+
+		_, err = cloudscheduler.NewJob(ctx, "updateAdpJob", &cloudscheduler.JobArgs{
+			HttpTarget: &cloudscheduler.JobHttpTargetArgs{
+				HttpMethod: pulumi.String("POST"),
+				Uri:        pulumi.String("https://api.heat1.app/league/v1/adp"),
+			},
+			Name:     pulumi.String("updateAdp"),
+			Region:   pulumi.String(region),
+			Schedule: pulumi.String("*/30 * * * *"), // execute every 30 minutes
 		})
 		if err != nil {
 			return err

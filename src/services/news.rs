@@ -50,10 +50,11 @@ impl NewsService {
             "josh bridges" => "Josh Bridges",
             "prvn" | "prvn fitness" => "PRVN",
             "krypton" | "crossfit krypton" => "Krypton",
+            "tyr wodapalooza" | "wodapalooza" | "wza" | "tyr wza" => "TYR Wodapalooza",
             _ => {
                 let message = format!("Media provider {} not found", source);
                 spawn_notification(ntfy::MEDIA.to_string(), message);
-                return "";
+                return source;
             }
         }
     }
@@ -99,6 +100,9 @@ impl NewsService {
             "prvn" | "prvn fitness" => "https://heat1storage.blob.core.windows.net/media/prvn.jpg",
             "krypton" | "crossfit krypton" => {
                 "https://heat1storage.blob.core.windows.net/media/krypton.jpg"
+            }
+            "tyr wodapalooza" | "wodapalooza" | "wza" | "tyr wza" => {
+                "https://heat1storage.blob.core.windows.net/media/wza.png"
             }
             _ => "",
         }

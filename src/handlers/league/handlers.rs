@@ -1,17 +1,17 @@
-use crate::handlers::league::request_models::UserLeaguePicksRequest;
+use crate::handlers::league::request_models::WorkoutPredictionRequest;
 use crate::{
     data::constants::ntfy,
     handlers::league::request_models::{
-        CreateLeague, JoinLeague, LeagueAthletes, LeagueLeaderboardRequest, OpenLeague,
-        UserLeaguesRequest,
+        CompetitionWorkoutRequest, CreateLeague, CreatePickRequest, JoinLeague,
+        LeaderboardMatchupRequest, LeagueAthletes, LeagueLeaderboardRequest, OpenLeague,
+        UserLeaguePicksRequest, UserLeaguesRequest,
     },
     services::league::LeagueService,
     utils::notification::spawn_notification,
 };
-use actix_web::web::Path;
 use actix_web::{
-    get, post,
-    web::{Json, Query, ServiceConfig},
+    get, post, put,
+    web::{Json, Path, Query, ServiceConfig},
     HttpResponse, Responder,
 };
 use validator::Validate;
@@ -25,7 +25,13 @@ pub fn configure(config: &mut ServiceConfig) {
         .service(get_shot_caller_picks)
         .service(get_user_leagues)
         .service(get_league_leaderboard)
-        .service(create_league);
+        .service(get_leaderboard_matchup)
+        .service(get_workout_prediction)
+        .service(save_user_league_pick)
+        .service(create_league)
+        .service(unlock_workout)
+        .service(lock_workout)
+        .service(update_adp);
 }
 
 #[get("/open")]
@@ -100,6 +106,24 @@ pub(crate) async fn get_user_leagues(req: Query<UserLeaguesRequest>) -> impl Res
     )
 }
 
+#[post("/pick")]
+pub(crate) async fn save_user_league_pick(req: Json<CreatePickRequest>) -> impl Responder {
+    LeagueService::save_user_league_pick(&req.0)
+        .await
+        .map_or_else(
+            |e| {
+                let error_message = format!(
+                    "get_user_league_picks: {:?}: -> {:?}",
+                    req.tournament_user_id, e
+                );
+                spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+                HttpResponse::InternalServerError().body("Error getting user league picks")
+            },
+            |leagues| HttpResponse::Ok().finish(),
+        )
+}
+
 #[get("/picks/{userTournamentId}")]
 pub(crate) async fn get_user_league_picks(req: Path<UserLeaguePicksRequest>) -> impl Responder {
     LeagueService::get_user_league_picks(&req.user_tournament_id)
@@ -154,6 +178,42 @@ pub(crate) async fn get_league_leaderboard(req: Path<LeagueLeaderboardRequest>) 
         )
 }
 
+#[get("/{tournamentId}/leaderboard/{userId}/{competitorId}")]
+pub(crate) async fn get_leaderboard_matchup(
+    req: Path<LeaderboardMatchupRequest>,
+) -> impl Responder {
+    LeagueService::get_leaderboard_matchup(&req.tournament_id, &req.user_id, &req.competitor_id)
+        .await
+        .map_or_else(
+            |e| {
+                let error_message = format!(
+                    "get_leaderboard_matchup: {:?}: -> {:?}",
+                    req.tournament_id, e
+                );
+                spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+                HttpResponse::InternalServerError().body("Error getting leaderboard matchup")
+            },
+            |matchup| HttpResponse::Ok().json(matchup),
+        )
+}
+
+#[get("/prediction/{competitionId}/{ordinal}")]
+pub(crate) async fn get_workout_prediction(req: Path<WorkoutPredictionRequest>) -> impl Responder {
+    LeagueService::get_workout_prediction(&req.competition_id, &req.ordinal)
+        .await
+        .map_or_else(
+            |e| {
+                let error_message =
+                    format!("get_workout_prediction: {:?}: -> {:?}", req.ordinal, e);
+                spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+                HttpResponse::InternalServerError().body("Error getting workout prediction")
+            },
+            |prediction| HttpResponse::Ok().json(prediction),
+        )
+}
+
 #[post("/")]
 pub(crate) async fn create_league(body: Json<CreateLeague>) -> impl Responder {
     if body.validate().is_err() {
@@ -191,5 +251,48 @@ pub(crate) async fn join_league(body: Json<JoinLeague>) -> impl Responder {
             HttpResponse::InternalServerError().body("Error joining league")
         },
         |response| HttpResponse::Ok().json(response),
+    )
+}
+
+#[put("/{competitionId}/{ordinal}/unlock")]
+pub(crate) async fn unlock_workout(req: Path<CompetitionWorkoutRequest>) -> impl Responder {
+    LeagueService::unlock_workout(req.competition_id, req.ordinal)
+        .await
+        .map_or_else(
+            |e| {
+                let message = format!("unlock_workout: -> {:?}", e);
+                spawn_notification(ntfy::ERROR.to_string(), message);
+
+                HttpResponse::InternalServerError().body("Error unlocking workout")
+            },
+            |_| HttpResponse::Ok().finish(),
+        )
+}
+
+#[put("/{competitionId}/{ordinal}/lock")]
+pub(crate) async fn lock_workout(req: Path<CompetitionWorkoutRequest>) -> impl Responder {
+    LeagueService::lock_workout(req.competition_id, req.ordinal)
+        .await
+        .map_or_else(
+            |e| {
+                let message = format!("lock_workout: -> {:?}", e);
+                spawn_notification(ntfy::ERROR.to_string(), message);
+
+                HttpResponse::InternalServerError().body("Error locking workout")
+            },
+            |_| HttpResponse::Ok().finish(),
+        )
+}
+
+#[post("/adp")]
+pub(crate) async fn update_adp() -> impl Responder {
+    LeagueService::update_adp().await.map_or_else(
+        |e| {
+            let message = format!("update_adp: -> {:?}", e);
+            spawn_notification(ntfy::ERROR.to_string(), message);
+
+            HttpResponse::InternalServerError().body("Error updating adp")
+        },
+        |_| HttpResponse::Ok().finish(),
     )
 }
