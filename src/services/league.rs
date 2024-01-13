@@ -1,7 +1,10 @@
+use crate::data::constants::ntfy;
+use crate::handlers::league::request_models::InsertScoresRequest;
 use crate::handlers::league::response_models::{
     CompetitionLeaderboardResponse, LeaderboardMatchupResponse, LeaderboardPicks,
     LeaderboardTournamentUserData, MatchupDetail, MatchupPick, WorkoutPredictionResponse,
 };
+use crate::utils::notification::spawn_notification;
 use crate::{
     data::models::tournament::Tournament,
     handlers::league::{
@@ -74,24 +77,53 @@ impl LeagueService {
             }
 
             if pick_request.previous_pick.competitor_id == 0 {
-                LeagueRepository::insert_user_league_pick(
-                    pick_request.tournament_user_id,
-                    pick_request.new_pick.competitor_id,
-                    pick_request.new_pick.rank,
-                )
-                .await?;
+                let user_picks =
+                    LeagueRepository::fetch_user_league_picks(&pick_request.tournament_user_id)
+                        .await?;
+
+                let is_existing_pick = user_picks.iter().find(|up| {
+                    up.rank == pick_request.new_pick.rank as u64
+                        && up.competitor_id == pick_request.new_pick.competitor_id as u64
+                });
+                if is_existing_pick.is_none() {
+                    LeagueRepository::insert_user_league_pick(
+                        pick_request.tournament_user_id,
+                        pick_request.new_pick.competitor_id,
+                        pick_request.new_pick.rank,
+                    )
+                    .await?;
+                } else {
+                    return Err(Error::Protocol(
+                        "Can't insert a pick that already exists".to_string(),
+                    ));
+                }
             }
         } else {
             if pick_request.previous_pick.competitor_id != 0 {
                 Self::delete_pick(pick_request).await?;
             }
             if pick_request.new_pick.competitor_id != 0 {
-                LeagueRepository::insert_user_league_pick(
-                    pick_request.tournament_user_id,
-                    pick_request.new_pick.competitor_id,
-                    pick_request.new_pick.rank,
-                )
-                .await?;
+                let user_picks =
+                    LeagueRepository::fetch_user_league_picks(&pick_request.tournament_user_id)
+                        .await?;
+
+                let is_existing_pick = user_picks.iter().find(|up| {
+                    up.rank == pick_request.new_pick.rank as u64
+                        && up.competitor_id == pick_request.new_pick.competitor_id as u64
+                });
+
+                if is_existing_pick.is_none() {
+                    LeagueRepository::insert_user_league_pick(
+                        pick_request.tournament_user_id,
+                        pick_request.new_pick.competitor_id,
+                        pick_request.new_pick.rank,
+                    )
+                    .await?;
+                } else {
+                    return Err(Error::Protocol(
+                        "Can't insert a pick that already exists".to_string(),
+                    ));
+                }
             }
         }
 
@@ -131,6 +163,48 @@ impl LeagueService {
         Ok(leaderboard)
     }
 
+    fn get_top_10_picks(
+        tournament_type_id: i64,
+        leaderboard: &HashMap<i64, CompetitionLeaderboardResponse>,
+    ) -> Vec<MatchupPick> {
+        let mut leaderboard_result = leaderboard
+            .clone()
+            .into_values()
+            .collect::<Vec<CompetitionLeaderboardResponse>>();
+
+        if tournament_type_id == 1 {
+            leaderboard_result.sort_by(|a, b| a.placement.partial_cmp(&b.placement).unwrap());
+        } else {
+            //TODO: Fix
+            leaderboard_result.sort_by(|a, b| a.placement.partial_cmp(&b.placement).unwrap());
+        }
+        leaderboard_result
+            .into_iter()
+            .map(|p: CompetitionLeaderboardResponse| {
+                let mut points: f64 = 0.0;
+
+                if tournament_type_id == 1 {
+                    points = 10.0;
+                } else {
+                    points = 100.0;
+                };
+                MatchupPick {
+                    predicted_rank: p.placement as u64,
+                    rank: p.placement as u64,
+                    first_name: p.first_name.clone(),
+                    last_name: p.last_name.clone(),
+                    competitor_id: p.competitor_id.clone() as u64,
+                    points,
+                    event_points: p.points,
+                    is_withdrawn: false,
+                    is_cut: false,
+                    is_suspended: false,
+                    is_final: false,
+                }
+            })
+            .collect()
+    }
+
     fn get_matchup_picks(
         tournament_type_id: i64,
         picks: Vec<LeaderboardPicks>,
@@ -166,6 +240,16 @@ impl LeagueService {
                         .unwrap_or(&0.0)
                         .clone();
                 };
+
+                let withdrawn_ids = vec![&317272i64, &73659i64, &298928i64];
+                let is_withdrawn = if competitor_leaderboard.competitor_id == 317272i64
+                    || competitor_leaderboard.competitor_id == 73659
+                    || competitor_leaderboard.competitor_id == 298928i64
+                {
+                    true
+                } else {
+                    false
+                };
                 MatchupPick {
                     predicted_rank: p.rank as u64,
                     rank: competitor_leaderboard.placement as u64,
@@ -174,10 +258,10 @@ impl LeagueService {
                     competitor_id: competitor_leaderboard.competitor_id.clone() as u64,
                     points,
                     event_points: competitor_leaderboard.points,
-                    is_withdrawn: false,
+                    is_withdrawn,
                     is_cut: false,
                     is_suspended: false,
-                    is_final: false,
+                    is_final: is_withdrawn,
                 }
             })
             .collect()
@@ -254,18 +338,25 @@ impl LeagueService {
             user_picks.women_competitor_ids.clone(),
             &women_leaderboard,
         );
+        let competitor_men_players = if *competitor_id == 0 {
+            Self::get_top_10_picks(metadata.tournament_type_id as i64, &men_leaderboard)
+        } else {
+            Self::get_matchup_picks(
+                metadata.tournament_type_id as i64,
+                competitor_picks.men_competitor_ids.clone(),
+                &men_leaderboard,
+            )
+        };
 
-        let competitor_men_players = Self::get_matchup_picks(
-            metadata.tournament_type_id as i64,
-            competitor_picks.men_competitor_ids.clone(),
-            &men_leaderboard,
-        );
-
-        let competitor_women_players = Self::get_matchup_picks(
-            metadata.tournament_type_id as i64,
-            competitor_picks.women_competitor_ids.clone(),
-            &women_leaderboard,
-        );
+        let competitor_women_players = if *competitor_id == 0 {
+            Self::get_top_10_picks(metadata.tournament_type_id as i64, &women_leaderboard)
+        } else {
+            Self::get_matchup_picks(
+                metadata.tournament_type_id as i64,
+                competitor_picks.women_competitor_ids.clone(),
+                &women_leaderboard,
+            )
+        };
 
         let leaderboard = LeaderboardMatchupResponse {
             locked_events: metadata.locked_events,
@@ -396,6 +487,10 @@ impl LeagueService {
                         if rank_diff < 0 {
                             rank_diff = rank_diff * -1;
                         }
+
+                        // if current_rank == 0 || current_rank > 15 {
+                        //     return 0.0;
+                        // }
 
                         let points = (10 - rank_diff) as f64;
 
@@ -569,6 +664,31 @@ impl LeagueService {
         };
 
         Ok(created_league)
+    }
+
+    pub async fn update_scores(scores: &InsertScoresRequest) -> Result<(), Error> {
+        let mut current_scores =
+            LeagueRepository::fetch_scores(scores.competition_id, scores.ordinal).await?;
+
+        for s in scores.scores.clone() {
+            let mut existing_score = current_scores
+                .iter()
+                .find(|cs| cs.competitor_id == s.athlete_id);
+
+            if existing_score.is_some() {
+                LeagueRepository::update_score(existing_score.unwrap().id as i64, s.points).await?;
+            } else {
+                LeagueRepository::insert_score(
+                    scores.competition_id,
+                    s.athlete_id as i64,
+                    scores.ordinal,
+                    s.points,
+                )
+                .await?;
+            }
+        }
+
+        LeagueRepository::refresh_competition_leaderboard().await
     }
 
     pub async fn join_league(league: &JoinLeague) -> Result<Vec<UserLeaguesResponse>, Error> {

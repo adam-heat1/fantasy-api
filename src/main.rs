@@ -1,7 +1,8 @@
 use actix_web::{web::scope, App, HttpServer};
 use fantasy_api::handlers::{
-    account::handlers as account_handlers, athlete::handlers as athlete_handlers,
-    league::handlers as league_handlers, news::handlers as news_handlers,
+    account::handlers as account_handlers, ads::handlers as ad_handlers,
+    athlete::handlers as athlete_handlers, league::handlers as league_handlers,
+    news::handlers as news_handlers,
 };
 use log::info;
 
@@ -15,6 +16,7 @@ async fn main() -> std::io::Result<()> {
             .service(scope("/athlete/v1").configure(athlete_handlers::configure))
             .service(scope("/league/v1").configure(league_handlers::configure))
             .service(scope("/news/v1").configure(news_handlers::configure))
+            .service(scope("/ads/v1").configure(ad_handlers::configure))
     })
     .bind("0.0.0.0:8080")?
     .run()

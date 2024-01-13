@@ -16,6 +16,9 @@ use crate::{
     },
 };
 
+use crate::data::models::competition::Competition;
+use crate::data::models::competitor::Competitor;
+use crate::data::models::score::Score;
 use crate::data::models::workout_stage_movement::WorkoutStageMovement;
 use crate::data::models::workout_stages::WorkoutStages;
 use sqlx::{Error, Row};
@@ -225,6 +228,8 @@ impl LeagueRepository {
                 workouts
             WHERE
                 competition_id = $1
+            ORDER BY
+                ordinal
             ",
         )
         .bind(competition_id)
@@ -589,6 +594,51 @@ impl LeagueRepository {
         return Ok(res);
     }
 
+    pub async fn fetch_scores(competition_id: i64, ordinal: i64) -> Result<Vec<Score>, Error> {
+        let pool = DataClient::connect().await?;
+
+        let res = sqlx::query(
+            "
+            SELECT
+                score.id,
+                score.points,
+                score.competitor_id
+            FROM 
+                score
+            WHERE
+                competition_id = $1
+                AND ordinal = $2
+            ",
+        )
+        .bind(competition_id)
+        .bind(ordinal)
+        .map(|row: sqlx::postgres::PgRow| Score {
+            id: row.get::<i64, _>("id") as u64,
+            points: row.get("points"),
+            competitor_id: row.get::<i64, _>("competitor_id") as u64,
+            competition_id: competition_id as u64,
+            ordinal: ordinal as u64,
+            rank: 0,
+            is_scaled: false,
+            crossfit_id: "".to_string(),
+            breakdown: "".to_string(),
+            heat: "".to_string(),
+            judge: "".to_string(),
+            lane: "".to_string(),
+            mobile_score_display: "".to_string(),
+            score_display: "".to_string(),
+            time: "".to_string(),
+            is_valid: false,
+            video: "".to_string(),
+            year: 0,
+            inserted_at: "".to_string(),
+        })
+        .fetch_all(&pool)
+        .await?;
+
+        return Ok(res);
+    }
+
     pub async fn fetch_user_leagues(
         user_league: &UserLeaguesRequest,
     ) -> Result<Vec<UserLeaguesResponse>, Error> {
@@ -618,7 +668,7 @@ impl LeagueRepository {
                 ON competition.id = tournament.competition_id 
             WHERE
                 tournament_users.user_id = $1
-                AND competition.id > 12
+                AND competition.id >= 13
             ",
         )
         .bind(user_league.user_id)
@@ -742,6 +792,30 @@ impl LeagueRepository {
         return Ok(res);
     }
 
+    pub async fn insert_score(
+        competition_id: i64,
+        competitor_id: i64,
+        ordinal: i64,
+        points: f64,
+    ) -> Result<(), Error> {
+        let pool = DataClient::connect().await?;
+
+        sqlx::query(
+            "
+            INSERT INTO score (competition_id, competitor_id, ordinal, rank, points) 
+            VALUES ($1, $2, $3, 0, $4)
+            ",
+        )
+        .bind(competition_id)
+        .bind(competitor_id)
+        .bind(ordinal)
+        .bind(points)
+        .execute(&pool)
+        .await?;
+
+        return Ok(());
+    }
+
     pub async fn insert_tournament_user(tournament_id: i64, user_id: i64) -> Result<(), Error> {
         let pool = DataClient::connect().await?;
 
@@ -755,6 +829,16 @@ impl LeagueRepository {
         .bind(user_id)
         .execute(&pool)
         .await?;
+
+        return Ok(());
+    }
+
+    pub async fn refresh_competition_leaderboard() -> Result<(), Error> {
+        let pool = DataClient::connect().await?;
+
+        sqlx::query("REFRESH MATERIALIZED VIEW competition_leaderboard")
+            .execute(&pool)
+            .await?;
 
         return Ok(());
     }
@@ -949,6 +1033,24 @@ impl LeagueRepository {
         )
         .bind(competitor_id)
         .bind(adp)
+        .execute(&pool)
+        .await?;
+
+        return Ok(());
+    }
+
+    pub async fn update_score(id: i64, points: f64) -> Result<(), Error> {
+        let pool = DataClient::connect().await?;
+
+        let _res = sqlx::query(
+            "
+            UPDATE score
+            SET points = $2
+            WHERE id = $1
+            ",
+        )
+        .bind(id)
+        .bind(points)
         .execute(&pool)
         .await?;
 

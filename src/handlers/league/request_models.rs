@@ -70,6 +70,25 @@ pub struct WorkoutPredictionRequest {
 }
 
 #[derive(Deserialize, Validate, Clone, Debug)]
+pub struct AthletePoints {
+    #[validate(range(min = 1))]
+    #[serde(rename = "athleteId")]
+    pub athlete_id: u64,
+    #[validate(range(min = 1))]
+    pub points: f64,
+}
+
+#[derive(Deserialize, Validate, Clone, Debug)]
+pub struct InsertScoresRequest {
+    #[validate(range(min = 1))]
+    #[serde(rename = "competitionId")]
+    pub competition_id: i64,
+    #[validate(range(min = 1))]
+    pub ordinal: i64,
+    pub scores: Vec<AthletePoints>,
+}
+
+#[derive(Deserialize, Validate, Clone, Debug)]
 pub struct OpenLeague {
     #[validate(range(min = 1))]
     #[serde(rename = "userId")]

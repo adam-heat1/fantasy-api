@@ -15,14 +15,11 @@ pub struct Score {
     pub judge: String,
     pub lane: String,
     pub mobile_score_display: String,
-    pub score_display:String,
+    pub score_display: String,
     pub time: String,
     pub is_valid: bool,
     pub video: String,
     pub year: u64,
-    pub points: u64,
+    pub points: f64,
     pub inserted_at: String,
-
-    pub competition: Competition,
-    pub competitor: Competitor,
 }

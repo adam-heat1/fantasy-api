@@ -1,4 +1,4 @@
-use crate::handlers::league::request_models::WorkoutPredictionRequest;
+use crate::handlers::league::request_models::{InsertScoresRequest, WorkoutPredictionRequest};
 use crate::{
     data::constants::ntfy,
     handlers::league::request_models::{
@@ -29,6 +29,7 @@ pub fn configure(config: &mut ServiceConfig) {
         .service(get_workout_prediction)
         .service(save_user_league_pick)
         .service(create_league)
+        .service(update_scores)
         .service(unlock_workout)
         .service(lock_workout)
         .service(update_adp);
@@ -118,7 +119,7 @@ pub(crate) async fn save_user_league_pick(req: Json<CreatePickRequest>) -> impl 
                 );
                 spawn_notification(ntfy::ERROR.to_string(), error_message);
 
-                HttpResponse::InternalServerError().body("Error getting user league picks")
+                HttpResponse::InternalServerError().finish()
             },
             |leagues| HttpResponse::Ok().finish(),
         )
@@ -231,6 +232,26 @@ pub(crate) async fn create_league(body: Json<CreateLeague>) -> impl Responder {
             HttpResponse::InternalServerError().body("Error creating league")
         },
         |response| HttpResponse::Ok().json(response),
+    )
+}
+
+#[post("/scores")]
+pub(crate) async fn update_scores(body: Json<InsertScoresRequest>) -> impl Responder {
+    if body.validate().is_err() {
+        let message = format!("update_scores: -> {:?}", body.validate().unwrap_err());
+        spawn_notification(ntfy::ERROR.to_string(), message);
+
+        return HttpResponse::BadRequest().body("Invalid update scores request");
+    }
+
+    LeagueService::update_scores(&body.0).await.map_or_else(
+        |e| {
+            let message = format!("update_scores: -> {:?}", e);
+            spawn_notification(ntfy::ERROR.to_string(), message);
+
+            HttpResponse::InternalServerError().body("Error updating scores")
+        },
+        |_| HttpResponse::Ok().finish(),
     )
 }
 
