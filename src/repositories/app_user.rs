@@ -14,9 +14,9 @@ impl AppUserRepository {
 
         let res = sqlx::query(
             "
-            SELECT 
+            SELECT
                 email
-            FROM 
+            FROM
                 app_user
             WHERE
                 LOWER(username) = $1
@@ -60,9 +60,9 @@ impl AppUserRepository {
 
         let res = sqlx::query(
             "
-            UPDATE 
+            UPDATE
                 app_user
-            SET 
+            SET
                 username = $1
             WHERE
                 id = $2
@@ -87,8 +87,8 @@ impl AppUserRepository {
             "
             INSERT INTO
                 app_user
-            (username, firebase_id, email, profile_url) 
-            VALUES 
+            (username, firebase_id, email, profile_url)
+            VALUES
                 ($1, $2, $3, $4)
             RETURNING
                 id
@@ -113,13 +113,13 @@ impl AppUserRepository {
 
         let res = sqlx::query(
             "
-            SELECT 
+            SELECT
                 id,
                 username,
                 firebase_id,
                 email,
                 profile_url
-            FROM 
+            FROM
                 app_user
             WHERE
                 firebase_id = $1
@@ -144,12 +144,12 @@ impl AppUserRepository {
 
         let res = sqlx::query(
             "
-            SELECT 
+            SELECT
                 id,
                 username,
                 email,
                 profile_url
-            FROM 
+            FROM
                 app_user
             WHERE
                 id = $1
@@ -167,5 +167,19 @@ impl AppUserRepository {
         };
 
         return Ok(user);
+    }
+
+    pub async fn update_profile_url(user_id: i64, image_url: String) -> Result<(), Error> {
+        let pool = DataClient::connect().await?;
+
+        let _ = sqlx::query("UPDATE app_user SET profile_url = $2 WHERE id = $1")
+            .bind(user_id)
+            .bind(format!(
+                "https://storage.googleapis.com/heat1-assets-pub/user/{image_url}",
+            ))
+            .execute(&pool)
+            .await?;
+
+        return Ok(());
     }
 }

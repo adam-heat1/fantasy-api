@@ -1,16 +1,19 @@
-use crate::handlers::league::request_models::{InsertScoresRequest, WorkoutPredictionRequest};
+use crate::handlers::league::request_models::{
+    CreateTopPickRequest, DeleteShotCallerPickRequest, DeleteTournamentRequest,
+    DeleteTournamentUserRequest, SwapPickRequest,
+};
 use crate::{
     data::constants::ntfy,
     handlers::league::request_models::{
-        CompetitionWorkoutRequest, CreateLeague, CreatePickRequest, JoinLeague,
-        LeaderboardMatchupRequest, LeagueAthletes, LeagueLeaderboardRequest, OpenLeague,
-        UserLeaguePicksRequest, UserLeaguesRequest,
+        CompetitionWorkoutRequest, CreateLeague, CreateShotCallerPickRequest, InsertScoresRequest,
+        JoinLeague, LeaderboardMatchupRequest, LeagueAthletes, LeagueLeaderboardRequest,
+        OpenLeague, UserLeaguePicksRequest, UserLeaguesRequest, WorkoutPredictionRequest,
     },
     services::league::LeagueService,
     utils::notification::spawn_notification,
 };
 use actix_web::{
-    get, post, put,
+    delete, get, post, put,
     web::{Json, Path, Query, ServiceConfig},
     HttpResponse, Responder,
 };
@@ -23,24 +26,28 @@ pub fn configure(config: &mut ServiceConfig) {
         .service(join_league)
         .service(get_user_league_picks)
         .service(get_shot_caller_picks)
+        .service(save_top_pick)
         .service(get_user_leagues)
         .service(get_league_leaderboard)
         .service(get_leaderboard_matchup)
+        .service(get_leaderboard_shotcaller_matchup)
         .service(get_workout_prediction)
-        .service(save_user_league_pick)
+        .service(save_shot_caller_pick)
         .service(create_league)
         .service(update_scores)
         .service(unlock_workout)
         .service(lock_workout)
-        .service(update_adp);
+        .service(update_adp)
+        .service(delete_top_pick)
+        .service(delete_shot_caller_pick)
+        .service(delete_tournament_user)
+        .service(delete_tournament)
+        .service(swap_pick);
 }
 
 #[get("/open")]
 pub(crate) async fn get_open_leagues(req: Query<OpenLeague>) -> impl Responder {
     if req.0.validate().is_err() {
-        let message = format!("get_open_leagues: -> {:?}", req.validate().unwrap_err());
-        spawn_notification(ntfy::ERROR.to_string(), message);
-
         return HttpResponse::BadRequest().body("Invalid open leagues request");
     }
 
@@ -50,15 +57,7 @@ pub(crate) async fn get_open_leagues(req: Query<OpenLeague>) -> impl Responder {
     LeagueService::get_open_leagues(competition_id, user_id)
         .await
         .map_or_else(
-            |e| {
-                let error_message = format!(
-                    "get_open_leagues: {} - {}: -> {:?}",
-                    competition_id, user_id, e
-                );
-                spawn_notification(ntfy::ERROR.to_string(), error_message);
-
-                HttpResponse::InternalServerError().body("Error getting open leagues")
-            },
+            |e| HttpResponse::BadRequest().body(e),
             |leagues| HttpResponse::Ok().json(leagues),
         )
 }
@@ -101,27 +100,134 @@ pub(crate) async fn get_user_leagues(req: Query<UserLeaguesRequest>) -> impl Res
             let error_message = format!("get_user_leagues: {:?}: -> {:?}", &req.0, e);
             spawn_notification(ntfy::ERROR.to_string(), error_message);
 
-            HttpResponse::InternalServerError().body("Error getting user leagues")
+            HttpResponse::BadRequest().body("Error getting user leagues")
         },
         |leagues| HttpResponse::Ok().json(leagues),
     )
 }
 
-#[post("/pick")]
-pub(crate) async fn save_user_league_pick(req: Json<CreatePickRequest>) -> impl Responder {
-    LeagueService::save_user_league_pick(&req.0)
+#[post("/swap-pick")]
+pub(crate) async fn swap_pick(req: Json<SwapPickRequest>) -> impl Responder {
+    LeagueService::swap_pick(&req.0).await.map_or_else(
+        |e| {
+            let error_message = format!("swap_pick: {:?}: -> {:?}", req.tournament_user_id, e);
+            spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+            HttpResponse::BadRequest().body(e)
+        },
+        |_| HttpResponse::Ok().finish(),
+    )
+}
+
+#[delete("/pick/shotcaller/{tournamentUserPickId}")]
+pub(crate) async fn delete_shot_caller_pick(
+    req: Path<DeleteShotCallerPickRequest>,
+) -> impl Responder {
+    LeagueService::delete_user_league_pick(req.tournament_user_pick_id)
         .await
         .map_or_else(
             |e| {
                 let error_message = format!(
-                    "get_user_league_picks: {:?}: -> {:?}",
+                    "delete_user_league_picks: {:?}: -> {:?}",
+                    req.tournament_user_pick_id, e
+                );
+                spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+                HttpResponse::InternalServerError().finish()
+            },
+            |_| HttpResponse::Ok().finish(),
+        )
+}
+
+#[delete("/pick/top/{tournamentUserPickId}")]
+pub(crate) async fn delete_top_pick(req: Path<DeleteShotCallerPickRequest>) -> impl Responder {
+    LeagueService::delete_user_league_top_pick(req.tournament_user_pick_id)
+        .await
+        .map_or_else(
+            |e| {
+                let error_message = format!(
+                    "delete_user_league_picks: {:?}: -> {:?}",
+                    req.tournament_user_pick_id, e
+                );
+                spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+                HttpResponse::InternalServerError().finish()
+            },
+            |_| HttpResponse::Ok().finish(),
+        )
+}
+
+#[delete("/tournament/{tournamentId}/{userId}")]
+pub(crate) async fn delete_tournament(req: Path<DeleteTournamentRequest>) -> impl Responder {
+    LeagueService::delete_tournament(req.tournament_id, req.user_id)
+        .await
+        .map_or_else(
+            |e| {
+                let error_message =
+                    format!("delete_tournament: {:?}: -> {:?}", req.tournament_id, e);
+                spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+                HttpResponse::BadRequest().finish()
+            },
+            |leagues| HttpResponse::Ok().json(leagues),
+        )
+}
+
+#[delete("/tournament-user/{tournamentUserId}/{userId}")]
+pub(crate) async fn delete_tournament_user(
+    req: Path<DeleteTournamentUserRequest>,
+) -> impl Responder {
+    LeagueService::delete_tournament_user(req.tournament_user_id, req.user_id)
+        .await
+        .map_or_else(
+            |e| {
+                let error_message = format!(
+                    "delete_tournament: {:?}: -> {:?}",
+                    req.tournament_user_id, e
+                );
+                spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+                HttpResponse::BadRequest().finish()
+            },
+            |leagues| HttpResponse::Ok().json(leagues),
+        )
+}
+
+#[post("/pick/top")]
+pub(crate) async fn save_top_pick(req: Json<CreateTopPickRequest>) -> impl Responder {
+    LeagueService::save_top_user_league_pick(&req.0)
+        .await
+        .map_or_else(
+            |e| {
+                let error_message = format!(
+                    "save_user_league_picks: {:?}: -> {:?}",
                     req.tournament_user_id, e
                 );
                 spawn_notification(ntfy::ERROR.to_string(), error_message);
 
                 HttpResponse::InternalServerError().finish()
             },
-            |leagues| HttpResponse::Ok().finish(),
+            |_| HttpResponse::Ok().finish(),
+        )
+}
+
+#[post("/pick/shotcaller")]
+pub(crate) async fn save_shot_caller_pick(
+    req: Json<CreateShotCallerPickRequest>,
+) -> impl Responder {
+    LeagueService::save_user_league_pick(&req.0)
+        .await
+        .map_or_else(
+            |e| {
+                let error_message = format!(
+                    "save_user_league_picks: {:?}: -> {:?}",
+                    req.tournament_user_id, e
+                );
+                spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+                HttpResponse::InternalServerError().finish()
+            },
+            |_| HttpResponse::Ok().finish(),
         )
 }
 
@@ -145,7 +251,7 @@ pub(crate) async fn get_user_league_picks(req: Path<UserLeaguePicksRequest>) -> 
 
 #[get("/picks/shotcaller/{userTournamentId}")]
 pub(crate) async fn get_shot_caller_picks(req: Path<UserLeaguePicksRequest>) -> impl Responder {
-    LeagueService::get_shot_caller_picks(&req.user_tournament_id)
+    LeagueService::get_shot_caller_picks_beta(&req.user_tournament_id)
         .await
         .map_or_else(
             |e| {
@@ -155,7 +261,7 @@ pub(crate) async fn get_shot_caller_picks(req: Path<UserLeaguePicksRequest>) -> 
                 );
                 spawn_notification(ntfy::ERROR.to_string(), error_message);
 
-                HttpResponse::InternalServerError().body("Error getting shot caller picks")
+                HttpResponse::BadRequest().body("Error getting shot caller picks")
             },
             |leagues| HttpResponse::Ok().json(leagues),
         )
@@ -163,7 +269,7 @@ pub(crate) async fn get_shot_caller_picks(req: Path<UserLeaguePicksRequest>) -> 
 
 #[get("/{tournamentId}/leaderboard")]
 pub(crate) async fn get_league_leaderboard(req: Path<LeagueLeaderboardRequest>) -> impl Responder {
-    LeagueService::get_league_leaderboard(&req.tournament_id)
+    LeagueService::get_league_leaderboard_new(&req.tournament_id)
         .await
         .map_or_else(
             |e| {
@@ -197,6 +303,30 @@ pub(crate) async fn get_leaderboard_matchup(
             },
             |matchup| HttpResponse::Ok().json(matchup),
         )
+}
+
+#[get("/{tournamentId}/leaderboard/shotcaller/{userId}/{competitorId}")]
+pub(crate) async fn get_leaderboard_shotcaller_matchup(
+    req: Path<LeaderboardMatchupRequest>,
+) -> impl Responder {
+    LeagueService::get_shotcaller_leaderboard_matchup(
+        &req.tournament_id,
+        &req.user_id,
+        &req.competitor_id,
+    )
+    .await
+    .map_or_else(
+        |e| {
+            let error_message = format!(
+                "get_leaderboard_matchup: {:?}: -> {:?}",
+                req.tournament_id, e
+            );
+            spawn_notification(ntfy::ERROR.to_string(), error_message);
+
+            HttpResponse::InternalServerError().body("Error getting leaderboard matchup")
+        },
+        |matchup| HttpResponse::Ok().json(matchup),
+    )
 }
 
 #[get("/prediction/{competitionId}/{ordinal}")]

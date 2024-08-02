@@ -1,5 +1,5 @@
 # Rust as the base image
-FROM rust:1.74 as build
+FROM rust:1.75 as build
 
 # 1. Create a new empty shell project
 RUN USER=root cargo new --bin fantasy-api

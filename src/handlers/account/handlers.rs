@@ -1,7 +1,9 @@
 use crate::handlers::account::request_models::GetFirebaseUserRequest;
 use crate::{
     data::constants::ntfy,
-    handlers::account::request_models::{CreateAccount, GetUserRequest, UpdateUsername, Username},
+    handlers::account::request_models::{
+        CreateAccount, GetUserRequest, UpdateProfilePictureRequest, UpdateUsername, Username,
+    },
     services::account::AccountService,
     utils::notification::spawn_notification,
 };
@@ -20,7 +22,8 @@ pub fn configure(config: &mut ServiceConfig) {
         .service(get_firebase_user)
         .service(validate_new_username)
         .service(update_username)
-        .service(create_account);
+        .service(create_account)
+        .service(update_profile_picure);
 }
 
 #[get("/firebase/{firebaseId}")]
@@ -175,4 +178,38 @@ pub(crate) async fn create_account(body: Json<CreateAccount>) -> impl Responder 
         },
         |account| HttpResponse::Ok().json(json!(account)),
     )
+}
+
+#[post("/profile/{userId}/{imageUrl}")]
+pub(crate) async fn update_profile_picure(
+    req: Path<UpdateProfilePictureRequest>,
+) -> impl Responder {
+    if req.validate().is_err() {
+        let message = format!(
+            "update_profile_picure: -> {:?}",
+            req.validate().unwrap_err()
+        );
+        spawn_notification(ntfy::ERROR.to_string(), message);
+
+        return HttpResponse::BadRequest().body("Invalid create account request");
+    }
+
+    AccountService::update_profile_picture(req.user_id, req.image_url.clone())
+        .await
+        .map_or_else(
+            |e| {
+                spawn_notification(
+                    ntfy::ERROR.to_string(),
+                    format!("Error creating account: {:?}: -> {:?}", req, e),
+                );
+
+                HttpResponse::InternalServerError().body("Error updating username")
+            },
+            |_| {
+                HttpResponse::Ok().body(format!(
+                    "https://storage.googleapis.com/heat1-assets-pub/user/{}",
+                    req.image_url
+                ))
+            },
+        )
 }

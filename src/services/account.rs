@@ -35,7 +35,7 @@ impl AccountService {
     }
 
     pub async fn create_account(user: &CreateAccount) -> Result<CreateAccountResponse, Error> {
-        let profile_url = "https://heat1storage.blob.core.windows.net/user/athlete-avatar.jpg";
+        let profile_url = "https://storage.googleapis.com/heat1-assets-pub/user/athlete-avatar.jpg";
 
         let new_user = AppUser {
             id: 0,
@@ -49,10 +49,8 @@ impl AccountService {
         let user_id = AppUserRepository::create_app_user(new_user).await?;
 
         join!(
-            LeagueRepository::insert_tournament_user(304, user_id),
-            LeagueRepository::insert_tournament_user(305, user_id),
-            LeagueRepository::insert_tournament_user(306, user_id),
-            LeagueRepository::insert_tournament_user(307, user_id)
+            LeagueRepository::insert_tournament_user(759, user_id),
+            LeagueRepository::insert_tournament_user(765, user_id),
         );
 
         let new_user = CreateAccountResponse {
@@ -73,6 +71,12 @@ impl AccountService {
 
     pub async fn get_user_by_user_id(user_id: &u64) -> Result<GetAccountResponse, Error> {
         let user = AppUserRepository::fetch_user_by_user_id(*user_id).await?;
+
+        Ok(user)
+    }
+
+    pub async fn update_profile_picture(user_id: i64, image_url: String) -> Result<(), Error> {
+        let user = AppUserRepository::update_profile_url(user_id, image_url.clone()).await?;
 
         Ok(user)
     }

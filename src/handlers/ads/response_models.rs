@@ -1,4 +1,3 @@
-use crate::handlers::league::response_models::MatchupPick;
 use serde_derive::{Deserialize, Serialize};
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
@@ -13,4 +12,9 @@ pub struct AdResponse {
     pub lightbox_url: String,
     #[serde(rename = "redirectUrl")]
     pub redirect_url: String,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct RotatingAdResponse {
+    pub ads: Vec<AdResponse>,
 }

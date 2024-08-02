@@ -19,18 +19,53 @@ pub struct UserLeaguesRequest {
 pub struct Pick {
     #[serde(rename = "competitorId")]
     pub competitor_id: i64,
-    pub rank: i64,
+    #[serde(rename = "tournamentPositionId")]
+    pub tournament_position_id: i64,
 }
 
 #[derive(Deserialize, Validate, Clone, Debug)]
-pub struct CreatePickRequest {
+pub struct CreateShotCallerPickRequest {
     #[validate(range(min = 1))]
     #[serde(rename = "tournamentUserId")]
     pub tournament_user_id: i64,
-    #[serde(rename = "previousPick")]
-    pub previous_pick: Pick,
-    #[serde(rename = "newPick")]
-    pub new_pick: Pick,
+    #[serde(rename = "workoutId")]
+    pub workout_id: i64,
+    #[serde(rename = "competitorId")]
+    pub competitor_id: i64,
+    #[serde(rename = "tournamentPositionId")]
+    pub tournament_position_id: i64,
+}
+
+#[derive(Deserialize, Validate, Clone, Debug)]
+pub struct CreateTopPickRequest {
+    #[validate(range(min = 1))]
+    #[serde(rename = "tournamentUserId")]
+    pub tournament_user_id: i64,
+    pub rank: i64,
+    #[serde(rename = "competitorId")]
+    pub competitor_id: i64,
+    #[serde(rename = "tournamentPositionId")]
+    pub tournament_position_id: i64,
+}
+
+#[derive(Deserialize, Validate, Clone, Debug)]
+pub struct NextPick {
+    #[serde(rename = "tournamentPositionId")]
+    pub tournament_position_id: Option<i64>,
+    #[serde(rename = "nextPickId")]
+    pub next_pick_id: Option<i64>,
+    pub rank: Option<i64>,
+}
+
+#[derive(Deserialize, Validate, Clone, Debug)]
+pub struct SwapPickRequest {
+    #[validate(range(min = 1))]
+    #[serde(rename = "tournamentUserId")]
+    pub tournament_user_id: i64,
+    #[serde(rename = "previousPickId")]
+    pub previous_pick_id: i64,
+    #[serde(rename = "nextPick")]
+    pub next_pick: NextPick,
 }
 
 #[derive(Deserialize, Validate, Clone, Debug)]
@@ -79,6 +114,33 @@ pub struct AthletePoints {
 }
 
 #[derive(Deserialize, Validate, Clone, Debug)]
+pub struct DeleteShotCallerPickRequest {
+    #[validate(range(min = 1))]
+    #[serde(rename = "tournamentUserPickId")]
+    pub tournament_user_pick_id: i64,
+}
+
+#[derive(Deserialize, Validate, Clone, Debug)]
+pub struct DeleteTournamentRequest {
+    #[validate(range(min = 1))]
+    #[serde(rename = "tournamentId")]
+    pub tournament_id: i64,
+    #[validate(range(min = 1))]
+    #[serde(rename = "userId")]
+    pub user_id: i64,
+}
+
+#[derive(Deserialize, Validate, Clone, Debug)]
+pub struct DeleteTournamentUserRequest {
+    #[validate(range(min = 1))]
+    #[serde(rename = "tournamentUserId")]
+    pub tournament_user_id: i64,
+    #[validate(range(min = 1))]
+    #[serde(rename = "userId")]
+    pub user_id: i64,
+}
+
+#[derive(Deserialize, Validate, Clone, Debug)]
 pub struct InsertScoresRequest {
     #[validate(range(min = 1))]
     #[serde(rename = "competitionId")]
@@ -114,6 +176,8 @@ pub struct CreateLeague {
     #[serde(rename = "isPrivate")]
     pub is_private: bool,
     pub passcode: Option<String>,
+    #[serde(rename = "pickCount")]
+    pub pick_count: Option<i64>,
 }
 
 #[derive(Deserialize, Validate, Clone, Debug)]

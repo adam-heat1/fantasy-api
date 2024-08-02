@@ -72,9 +72,9 @@ func main() {
 			Project:            pulumi.String(projectID),
 			Settings: &sql.DatabaseInstanceSettingsArgs{
 				// Tier: pulumi.String("db-custom-1-3840"), // 1 vCPU, 3.75 GB RAM
-				// Tier: 					  pulumi.String("db-custom-2-7680"), // 2 vCPU, 7.5 GB RAM
-				// Tier: pulumi.String("db-custom-4-15360"), // 4 vCPU, 15 GB RAM
-				Tier: pulumi.String("db-custom-8-30720"), // 8 vCPU, 30 GB RAM
+				Tier: pulumi.String("db-custom-2-7680"), // 2 vCPU, 7.5 GB RAM
+				// 				Tier: pulumi.String("db-custom-4-15360"), // 4 vCPU, 15 GB RAM
+				// Tier: pulumi.String("db-custom-8-30720"), // 8 vCPU, 30 GB RAM
 				// Tier:                      pulumi.String("db-custom-16-61440"),// 16 vCPU, 60 GB RAM
 				// Tier:                      pulumi.String("db-custom-32-122880"),// 32 vCPU, 120 GB RAM
 				DeletionProtectionEnabled: pulumi.Bool(false),
@@ -96,6 +96,18 @@ func main() {
 						&sql.DatabaseInstanceSettingsIpConfigurationAuthorizedNetworkArgs{
 							Name:  pulumi.String("Culver Home"),
 							Value: pulumi.String("50.27.208.112"),
+						},
+						&sql.DatabaseInstanceSettingsIpConfigurationAuthorizedNetworkArgs{
+							Name:  pulumi.String("Ambrosius Home"),
+							Value: pulumi.String("71.85.201.115"),
+						},
+						&sql.DatabaseInstanceSettingsIpConfigurationAuthorizedNetworkArgs{
+							Name:  pulumi.String("Culver Lake"),
+							Value: pulumi.String("75.91.173.119"),
+						},
+						&sql.DatabaseInstanceSettingsIpConfigurationAuthorizedNetworkArgs{
+							Name:  pulumi.String("WeWork"),
+							Value: pulumi.String("38.140.137.74"),
 						},
 					},
 				},

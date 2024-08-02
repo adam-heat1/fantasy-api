@@ -1,4 +1,3 @@
-use super::{competition::Competition, competitor::Competitor};
 use serde::Serialize;
 
 #[derive(Serialize)]

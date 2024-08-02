@@ -36,3 +36,11 @@ pub struct GetUserRequest {
     #[serde(rename = "userId")]
     pub user_id: u64,
 }
+
+#[derive(Deserialize, Validate, Clone, Debug)]
+pub struct UpdateProfilePictureRequest {
+    #[serde(rename = "userId")]
+    pub user_id: i64,
+    #[serde(rename = "imageUrl")]
+    pub image_url: String,
+}
