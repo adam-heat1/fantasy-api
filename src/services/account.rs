@@ -35,7 +35,7 @@ impl AccountService {
     }
 
     pub async fn create_account(user: &CreateAccount) -> Result<CreateAccountResponse, Error> {
-        let profile_url = "https://storage.googleapis.com/heat1-assets-pub/user/athlete-avatar.jpg";
+        let profile_url = "https://assets.heat1.app/user/athlete-avatar.jpg";
 
         let new_user = AppUser {
             id: 0,
@@ -49,8 +49,8 @@ impl AccountService {
         let user_id = AppUserRepository::create_app_user(new_user).await?;
 
         join!(
-            LeagueRepository::insert_tournament_user(759, user_id),
-            LeagueRepository::insert_tournament_user(765, user_id),
+            LeagueRepository::insert_tournament_user(1281, user_id),
+            LeagueRepository::insert_tournament_user(1297, user_id),
         );
 
         let new_user = CreateAccountResponse {

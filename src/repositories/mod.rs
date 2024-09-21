@@ -1,3 +1,4 @@
+pub mod ads;
 pub mod app_user;
 pub mod competitor;
 pub mod crossfit;

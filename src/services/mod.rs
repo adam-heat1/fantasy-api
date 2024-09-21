@@ -1,7 +1,8 @@
 pub mod account;
+pub mod ads;
 pub mod athlete;
-pub mod crossfit;
 pub mod competition;
+pub mod crossfit;
 pub mod league;
 pub mod news;
 pub mod open;

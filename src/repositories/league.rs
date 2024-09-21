@@ -1,9 +1,10 @@
 use crate::data::models::workout::Workout;
 use crate::handlers::league::response_models::{
     CompetitionLeaderboardResponse, LeaderboardEntry, LeaderboardPicks, LeaderboardShotcallerPicks,
-    LeaderboardShotcallerTournamentUserData, LeaguePosition, MatchupShotcallerPick, PickCompetitor,
-    PickPercentage, PropBet, PropBetOption, UserLeaguesTopPicksDataResponse,
-    WorkoutPredictionCountResponse, WorkoutPredictionResponse, WorkoutResponse,
+    LeaderboardShotcallerTournamentUserData, LeaguePosition, MatchupShotcallerPick,
+    MatchupShotcallerPick2, PickCompetitor, PickPercentage, PropBet, PropBetOption,
+    UserLeaguesTopPicksDataResponse, WorkoutPredictionCountResponse, WorkoutPredictionResponse,
+    WorkoutResponse,
 };
 use crate::{
     data::{data_client::DataClient, models::tournament::Tournament},
@@ -408,7 +409,8 @@ impl LeagueRepository {
                 sponsor,
                 sponsor_link,
                 sponsor_logo,
-                sponsor_logo_dark
+                sponsor_logo_dark,
+                short_name
             FROM
                 workouts
             WHERE
@@ -431,6 +433,7 @@ impl LeagueRepository {
             sponsor_link: row.get("sponsor_link"),
             sponsor_logo: row.get("sponsor_logo"),
             sponsor_logo_dark: row.get("sponsor_logo_dark"),
+            short_name: row.get("short_name"),
         })
         .fetch_all(&pool)
         .await?;
@@ -457,7 +460,8 @@ impl LeagueRepository {
                 w.sponsor,
                 w.sponsor_link,
                 w.sponsor_logo,
-                w.sponsor_logo_dark
+                w.sponsor_logo_dark,
+                w.short_name
             FROM
                 workouts w
             JOIN
@@ -481,6 +485,7 @@ impl LeagueRepository {
             sponsor_link: row.get("sponsor_link"),
             sponsor_logo: row.get("sponsor_logo"),
             sponsor_logo_dark: row.get("sponsor_logo_dark"),
+            short_name: row.get("short_name"),
             stages: None,
         })
         .fetch_all(&pool)
@@ -506,7 +511,8 @@ impl LeagueRepository {
                 sponsor,
                 sponsor_link,
                 sponsor_logo,
-                sponsor_logo_dark
+                sponsor_logo_dark,
+                short_name
             FROM
                 workouts
             WHERE
@@ -527,6 +533,7 @@ impl LeagueRepository {
             sponsor_link: row.get("sponsor_link"),
             sponsor_logo: row.get("sponsor_logo"),
             sponsor_logo_dark: row.get("sponsor_logo_dark"),
+            short_name: row.get("short_name"),
         })
         .fetch_one(&pool)
         .await?;
@@ -551,7 +558,8 @@ impl LeagueRepository {
                 workouts.sponsor,
                 workouts.sponsor_link,
                 workouts.sponsor_logo,
-                workouts.sponsor_logo_dark
+                workouts.sponsor_logo_dark,
+                workouts.short_name
             FROM
                 workouts
             JOIN
@@ -575,6 +583,7 @@ impl LeagueRepository {
             sponsor_link: row.get("sponsor_link"),
             sponsor_logo: row.get("sponsor_logo"),
             sponsor_logo_dark: row.get("sponsor_logo_dark"),
+            short_name: row.get("short_name"),
         })
         .fetch_one(&pool)
         .await?;
@@ -795,7 +804,7 @@ impl LeagueRepository {
                 tu.id as tournament_user_id,
                 au.username,
                 au.profile_url,
-                SUM(CASE WHEN 10 - ABS(rank - placement) < 0 THEN 0 ELSE 10 - ABS(rank - placement) END) as points,
+                COALESCE(SUM(CASE WHEN 10 - ABS(rank - placement) < 0 THEN 0 ELSE 10 - ABS(rank - placement) END), 0)::bigint as points,
                 SUM(CASE WHEN 10 - ABS(rank - placement) = 10 THEN 1 ELSE 0 END) as exact_picks,
                 RANK() OVER (
                     ORDER BY COALESCE(
@@ -821,11 +830,11 @@ impl LeagueRepository {
         )
         .bind(tournament_id)
         .bind(competition_id)
-        .map(|row: sqlx::postgres::PgRow| LeaderboardEntry {
+        .map(|row: PgRow| LeaderboardEntry {
             tournament_user_id: row.get::<i64, _>("tournament_user_id") as u64,
             display_name: row.get("username"),
             avatar: row.get("profile_url"),
-            points: row.try_get("points").unwrap_or(0.0),
+            points: row.get("points"),
             event_wins: row.get("exact_picks"),
             ordinal: row.get("ordinal"),
         })
@@ -843,19 +852,16 @@ impl LeagueRepository {
 
         let res = sqlx::query(
             "
-            SELECT
-                tu.id as tournament_user_id,
-                au.username,
-                au.profile_url,
-                sum(s.points) AS points,
-                COUNT(*) FILTER (WHERE s.points = 100) AS exact_picks,
-                RANK() OVER (
-                    ORDER BY COALESCE(SUM(s.points), 0::double precision) DESC,
-                    COUNT(*) FILTER (WHERE s.points = 100) DESC
-                ) AS ordinal
-            FROM tournament_users tu
-                JOIN app_user au
-                    ON au.id = tu.user_id
+            WITH workout_points AS (
+                SELECT
+                    tu.id AS tournament_user_id,
+                    au.username,
+                    au.profile_url,
+                    COALESCE(SUM(s.points), 0) AS workout_points,
+                	COUNT(*) FILTER (WHERE s.points = 100) AS exact_picks
+                FROM tournament_users tu
+                    JOIN app_user au
+                        ON au.id = tu.user_id
                 LEFT JOIN tournament_user_picks tup
                     ON tup.tournament_user_id = tu.id
                 LEFT JOIN workouts w
@@ -864,13 +870,57 @@ impl LeagueRepository {
                     ON s.competitor_id = tup.competitor_id
                     AND s.ordinal = w.ordinal
                     AND s.competition_id = $2
-            WHERE
-                tu.tournament_id = $1
-                AND (tup.is_invalid IS NULL OR tup.is_invalid = false)
-            GROUP BY
-                tu.id,
+                WHERE
+                    tu.tournament_id = $1
+                    AND (tup.is_invalid IS NULL OR tup.is_invalid = false)
+                GROUP BY
+                    tu.id,
+                    au.username,
+                    au.profile_url
+            ),
+            prop_points AS (
+              SELECT
+                tu.id AS tournament_user_id,
                 au.username,
-                au.profile_url
+                au.profile_url,
+                COALESCE(SUM(po.points), 0) AS prop_points
+              FROM tournament_users tu
+                JOIN app_user au
+                    ON au.id = tu.user_id
+                LEFT JOIN prop_picks pp
+                    ON pp.tournament_user_id = tu.id
+                LEFT JOIN prop_options po
+                    ON po.id = pp.prop_option_id
+                WHERE
+                    tu.tournament_id = $1
+                    AND pp.is_valid = true
+                    AND po.is_winner = true
+                GROUP BY
+                    tu.id,
+                    au.username,
+                    au.profile_url
+            )
+            SELECT
+            	wp.tournament_user_id,
+                wp.username,
+                wp.profile_url,
+                (COALESCE(wp.workout_points, 0) + COALESCE(pp.prop_points, 0))::bigint AS points,
+                wp.exact_picks,
+                RANK() OVER (
+              	    ORDER BY COALESCE(wp.workout_points, 0) + COALESCE(pp.prop_points, 0) DESC,
+                    wp.exact_picks DESC
+             	) AS ordinal
+            FROM workout_points wp
+            LEFT JOIN prop_points pp
+                ON wp.username = pp.username
+                AND wp.profile_url = pp.profile_url
+            GROUP BY
+             	wp.tournament_user_id,
+                wp.username,
+                wp.profile_url,
+                wp.workout_points,
+                pp.prop_points,
+                wp.exact_picks
             ",
         )
         .bind(tournament_id)
@@ -879,7 +929,7 @@ impl LeagueRepository {
             tournament_user_id: row.get::<i64, _>("tournament_user_id") as u64,
             display_name: row.get("username"),
             avatar: row.get("profile_url"),
-            points: row.try_get("points").unwrap_or(0.0),
+            points: row.get::<i64, _>("points"),
             event_wins: row.get("exact_picks"),
             ordinal: row.get("ordinal"),
         })
@@ -902,6 +952,7 @@ impl LeagueRepository {
                 competitor.gender_id,
                 competitor.first_name,
                 competitor.last_name,
+                competitor.profile_url,
                 competition_competitor.is_withdrawn,
                 COALESCE(points, 0) as points,
                 ordinal_finishes,
@@ -933,6 +984,7 @@ impl LeagueRepository {
                 finishes: row.try_get("ordinal_finishes").unwrap_or(vec![]),
                 placement: row.get("placement"),
                 is_withdrawn: row.get("is_withdrawn"),
+                image_url: row.get("profile_url"),
             },
         )
         .fetch_all(&pool)
@@ -1016,7 +1068,7 @@ impl LeagueRepository {
     pub async fn fetch_shotcaller_picks(
         tournament_id: i64,
         user_id: i64,
-    ) -> Result<Vec<MatchupShotcallerPick>, Error> {
+    ) -> Result<Vec<MatchupShotcallerPick2>, Error> {
         let pool = DataClient::connect().await?;
 
         let res = sqlx::query(
@@ -1027,6 +1079,7 @@ impl LeagueRepository {
                 tup.workout_id,
                 c.first_name,
                 c.last_name,
+                c.profile_url,
                 cc.is_suspended,
                 cc.is_cut,
                 cc.is_withdrawn,
@@ -1059,7 +1112,7 @@ impl LeagueRepository {
         )
         .bind(tournament_id)
         .bind(user_id)
-        .map(|row: PgRow| MatchupShotcallerPick {
+        .map(|row: PgRow| MatchupShotcallerPick2 {
             competitor_id: row.get("competitor_id"),
             tournament_position_id: row.get("tournament_position_id"),
             workout_id: row.get("workout_id"),
@@ -1069,6 +1122,7 @@ impl LeagueRepository {
             is_cut: row.get("is_cut"),
             is_withdrawn: row.get("is_withdrawn"),
             points: row.try_get("points").unwrap_or(0.0),
+            image_url: row.get("profile_url"),
         })
         .fetch_all(&pool)
         .await?;
@@ -1204,11 +1258,13 @@ impl LeagueRepository {
                 competition_competitor.position_id,
                 competitor.first_name,
                 competitor.last_name,
+                competitor.profile_url,
                 competitor.gender_id,
                 competition.is_active,
                 competition.is_complete,
                 competition_competitor.adp,
-                positions.name as position_name
+                positions.name as position_name,
+                country.image_url as country_image_url
             FROM
                 competition_competitor
             JOIN
@@ -1220,6 +1276,9 @@ impl LeagueRepository {
             LEFT JOIN
                 positions
                 ON competition_competitor.position_id = positions.id
+            LEFT JOIN
+                country
+                ON country.id = competitor.country_id
             WHERE
                 competition.id = $1
             ",
@@ -1239,6 +1298,8 @@ impl LeagueRepository {
                 is_suspended: row.get("is_suspended"),
                 position_id: row.get("position_id"),
                 position: row.get("position_name"),
+                image_url: row.try_get("profile_url").unwrap_or("".to_string()),
+                country_image_url: row.get("country_image_url"),
             };
         })
         .fetch_all(&pool)
@@ -1303,7 +1364,7 @@ impl LeagueRepository {
                 positions.abbreviation as position_abbreviation,
                 tournament_positions.ordinal as position_ordinal,
                 positions.image_url as position_image_url,
-                tournament_positions.allowed_positions
+                positions.allowed_positions
             FROM
                 tournament_positions
             LEFT JOIN
@@ -1357,7 +1418,7 @@ impl LeagueRepository {
                 positions.abbreviation as position_abbreviation,
                 tournament_positions.ordinal as position_ordinal,
                 positions.image_url as position_image_url,
-                tournament_positions.allowed_positions
+                positions.allowed_positions
             FROM
                 tournament_users
             JOIN
@@ -1896,7 +1957,7 @@ impl LeagueRepository {
         .bind(tournament.passcode)
         .bind(tournament.commissioner_id as i64)
         .bind(tournament.pick_count.unwrap_or(0i64))
-            .bind(if tournament.tournament_type_id == 1 { "https://storage.googleapis.com/heat1-assets-pub/tournament/Top%2010%20Heat%201.png" } else { "https://storage.googleapis.com/heat1-assets-pub/tournament/Heat1%20shotcaller.png"})
+            .bind(if tournament.tournament_type_id == 1 { "https://assets.heat1.app/tournament/top10.png" } else { "https://assets.heat1.app/tournament/shotcaller.png"})
         .fetch_one(&pool)
         .await?;
 

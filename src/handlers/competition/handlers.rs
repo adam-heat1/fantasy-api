@@ -12,24 +12,14 @@ use validator::Validate;
 pub fn configure(config: &mut ServiceConfig) {
     config
         .service(get_competitors)
-        .service(get_active_competitions)
         .service(get_active_beta_competitions)
         .service(create_competittion_competitor);
 }
 
+// Deprecated
 #[get("/active/beta")]
 pub(crate) async fn get_active_beta_competitions() -> impl Responder {
     CompetitionService::fetch_active_beta_competitions()
-        .await
-        .map_or_else(
-            |e| HttpResponse::InternalServerError().body(e.to_string()),
-            |competitions| HttpResponse::Ok().json(competitions),
-        )
-}
-
-#[get("/active")]
-pub(crate) async fn get_active_competitions() -> impl Responder {
-    CompetitionService::fetch_active_competitions()
         .await
         .map_or_else(
             |e| HttpResponse::InternalServerError().body(e.to_string()),

@@ -1,7 +1,8 @@
 use crate::handlers::league::request_models::{CreateTopPickRequest, SwapPickRequest};
 use crate::handlers::league::response_models::{
-    LeaderboardMatchupShotcallerResponse, LeaderboardShotcallerPicks, MatchupShotcallerDetail,
-    MatchupShotcallerPick, PositionPicks, ShotCallerPicksBetaResponse,
+    LeaderboardMatchupShotcallerResponse, LeaderboardMatchupShotcallerResponse2,
+    LeaderboardShotcallerPicks, MatchupShotcallerDetail, MatchupShotcallerDetail2,
+    MatchupShotcallerPick, PickPercentage, PositionPicks, ShotCallerPicksBetaResponse,
     UserLeaguesTopPicksDataResponse,
 };
 use crate::{
@@ -397,6 +398,7 @@ impl LeagueService {
                 is_cut: false,
                 is_suspended: false,
                 is_final: false,
+                image_url: p.image_url.clone(),
             })
             .collect()
     }
@@ -461,6 +463,7 @@ impl LeagueService {
                     is_cut: false,
                     is_suspended: false,
                     is_final: competitor_leaderboard.is_withdrawn,
+                    image_url: competitor_leaderboard.image_url.clone(),
                 }
             })
             .collect()
@@ -572,7 +575,7 @@ impl LeagueService {
         tournament_id: &i64,
         user_id: &i64,
         competitor_id: &i64,
-    ) -> Result<LeaderboardMatchupShotcallerResponse, Error> {
+    ) -> Result<LeaderboardMatchupShotcallerResponse2, Error> {
         let res = join!(
             LeagueRepository::fetch_workouts_by_tournament(*tournament_id),
             LeagueRepository::fetch_shotcaller_picks(*tournament_id, *user_id),
@@ -606,9 +609,9 @@ impl LeagueService {
             })
             .picks;
 
-        Ok(LeaderboardMatchupShotcallerResponse {
+        Ok(LeaderboardMatchupShotcallerResponse2 {
             workouts,
-            user_matchup: MatchupShotcallerDetail {
+            user_matchup: MatchupShotcallerDetail2 {
                 points: user_picks.iter().map(|p| p.points).sum(),
                 players: user_picks,
                 prop_points: if user_prop_picks.len() > 0 {
@@ -619,7 +622,7 @@ impl LeagueService {
                 prop_picks: user_prop_picks,
             },
 
-            competitor_matchup: MatchupShotcallerDetail {
+            competitor_matchup: MatchupShotcallerDetail2 {
                 points: competitor_picks.iter().map(|p| p.points).sum(),
                 players: competitor_picks,
                 prop_points: if competitor_prop_picks.len() > 0 {
@@ -648,6 +651,7 @@ impl LeagueService {
                 finishes: vec![],
                 placement: 0,
                 is_withdrawn: false,
+                image_url: "".to_string(),
             })
             .clone()
     }
@@ -914,6 +918,7 @@ impl LeagueService {
                     sponsor_logo: w.sponsor_logo.clone(),
                     sponsor_logo_dark: w.sponsor_logo_dark.clone(),
                     sponsor_link: w.sponsor_link.clone(),
+                    short_name: w.short_name.clone(),
                     stages: Some(stages),
                 }
             })
@@ -922,7 +927,10 @@ impl LeagueService {
         athletes.iter_mut().for_each(|a| {
             let pick_percentage = pick_percentages
                 .get(&(a.competitor_id as i64))
-                .unwrap()
+                .unwrap_or(&vec![PickPercentage {
+                    percentage: 0.0,
+                    workout_id: 0,
+                }])
                 .clone();
             a.pick_percentage = pick_percentage;
         });
@@ -1127,8 +1135,16 @@ impl LeagueService {
                 LeagueRepository::insert_tournament_position(league_id as i64, i + 5, i).await?;
             }
         } else {
-            for i in 1..=5i64 {
-                LeagueRepository::insert_tournament_position(league_id as i64, i, i).await?;
+            if league.competition_id == 28 {
+                for i in 1..=5i64 {
+                    LeagueRepository::insert_tournament_position(league_id as i64, i, i).await?;
+                }
+            } else if league.competition_id == 29 {
+                LeagueRepository::insert_tournament_position(league_id as i64, 46, 1).await?;
+            } else {
+                LeagueRepository::insert_tournament_position(league_id as i64, 47, 1).await?;
+                LeagueRepository::insert_tournament_position(league_id as i64, 48, 2).await?;
+                LeagueRepository::insert_tournament_position(league_id as i64, 46, 3).await?;
             }
         }
 
@@ -1328,7 +1344,7 @@ impl LeagueService {
     }
 
     pub async fn update_adp() -> Result<(), Error> {
-        let competition_id = 28i64;
+        let competition_id = 29i64;
         join!(
             Self::update_competition_gender_adp_new(competition_id, 1),
             Self::update_competition_gender_adp_new(competition_id, 2)

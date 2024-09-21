@@ -175,7 +175,7 @@ impl AppUserRepository {
         let _ = sqlx::query("UPDATE app_user SET profile_url = $2 WHERE id = $1")
             .bind(user_id)
             .bind(format!(
-                "https://storage.googleapis.com/heat1-assets-pub/user/{image_url}",
+                "https://assets.heat1.app/user/{image_url}",
             ))
             .execute(&pool)
             .await?;

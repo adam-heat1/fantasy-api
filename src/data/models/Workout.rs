@@ -14,4 +14,5 @@ pub struct Workout {
     pub sponsor_logo_dark: Option<String>,
     pub sponsor_link: Option<String>,
     pub is_complete: bool,
+    pub short_name: Option<String>,
 }

@@ -78,6 +78,7 @@ impl CompetitorRepository {
                 c.height,
                 c.weight,
                 c.instagram,
+                c.profile_url,
                 cc.news_blurb,
                 r.name as region
             FROM
@@ -104,6 +105,7 @@ impl CompetitorRepository {
             instagram: row.get("instagram"),
             region: row.get("region"),
             news_blurb: row.get("news_blurb"),
+            image_url: row.get("profile_url"),
         })
         .fetch_one(&pool)
         .await?;

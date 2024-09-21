@@ -71,9 +71,9 @@ func main() {
 			Name:               pulumi.String(databaseName),
 			Project:            pulumi.String(projectID),
 			Settings: &sql.DatabaseInstanceSettingsArgs{
-				// Tier: pulumi.String("db-custom-1-3840"), // 1 vCPU, 3.75 GB RAM
-				Tier: pulumi.String("db-custom-2-7680"), // 2 vCPU, 7.5 GB RAM
-				// 				Tier: pulumi.String("db-custom-4-15360"), // 4 vCPU, 15 GB RAM
+				Tier: pulumi.String("db-custom-1-3840"), // 1 vCPU, 3.75 GB RAM
+				// Tier: pulumi.String("db-custom-2-7680"), // 2 vCPU, 7.5 GB RAM
+				// Tier: pulumi.String("db-custom-4-15360"), // 4 vCPU, 15 GB RAM
 				// Tier: pulumi.String("db-custom-8-30720"), // 8 vCPU, 30 GB RAM
 				// Tier:                      pulumi.String("db-custom-16-61440"),// 16 vCPU, 60 GB RAM
 				// Tier:                      pulumi.String("db-custom-32-122880"),// 32 vCPU, 120 GB RAM
@@ -95,7 +95,7 @@ func main() {
 						},
 						&sql.DatabaseInstanceSettingsIpConfigurationAuthorizedNetworkArgs{
 							Name:  pulumi.String("Culver Home"),
-							Value: pulumi.String("50.27.208.112"),
+							Value: pulumi.String("50.96.219.55"),
 						},
 						&sql.DatabaseInstanceSettingsIpConfigurationAuthorizedNetworkArgs{
 							Name:  pulumi.String("Ambrosius Home"),
@@ -104,10 +104,6 @@ func main() {
 						&sql.DatabaseInstanceSettingsIpConfigurationAuthorizedNetworkArgs{
 							Name:  pulumi.String("Culver Lake"),
 							Value: pulumi.String("75.91.173.119"),
-						},
-						&sql.DatabaseInstanceSettingsIpConfigurationAuthorizedNetworkArgs{
-							Name:  pulumi.String("WeWork"),
-							Value: pulumi.String("38.140.137.74"),
 						},
 					},
 				},
@@ -203,9 +199,10 @@ func main() {
 				HttpMethod: pulumi.String("POST"),
 				Uri:        pulumi.String("https://api.heat1.app/league/v1/adp"),
 			},
-			Name:     pulumi.String("updateAdp"),
-			Region:   pulumi.String(region),
-			Schedule: pulumi.String("*/30 * * * *"), // execute every 30 minutes
+			Name:   pulumi.String("updateAdp"),
+			Region: pulumi.String(region),
+			// 			Schedule: pulumi.String("*/30 * * * *"), // execute every 30 minutes
+			Schedule: pulumi.String("15 * * * *"), // execute on the 15th minute of every hour
 		})
 		if err != nil {
 			return err

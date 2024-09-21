@@ -1,4 +1,3 @@
-use crate::data::models::workout::Workout;
 use crate::handlers::props::response_models::PropMatchupDetail;
 use serde_derive::{Deserialize, Serialize};
 
@@ -41,7 +40,7 @@ pub struct LeaderboardEntry {
     #[serde(rename = "displayName")]
     pub display_name: String,
     pub avatar: String,
-    pub points: f64,
+    pub points: i64,
     pub event_wins: i64,
     pub ordinal: i64,
 }
@@ -67,6 +66,8 @@ pub struct MatchupPick {
     pub first_name: String,
     #[serde(rename = "lastName")]
     pub last_name: String,
+    #[serde(rename = "imageUrl")]
+    pub image_url: String,
     pub points: f64,
     #[serde(rename = "eventPoints")]
     pub event_points: f64,
@@ -92,7 +93,32 @@ pub struct MatchupShotcallerPick {
     pub first_name: String,
     #[serde(rename = "lastName")]
     pub last_name: String,
+    #[serde(rename = "imageUrl")]
+    pub image_url: String,
     #[serde(rename = "eventPoints")]
+    pub points: f64,
+    #[serde(rename = "isWithdrawn")]
+    pub is_withdrawn: bool,
+    #[serde(rename = "isCut")]
+    pub is_cut: bool,
+    #[serde(rename = "isSuspended")]
+    pub is_suspended: bool,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct MatchupShotcallerPick2 {
+    #[serde(rename = "competitorId")]
+    pub competitor_id: i64,
+    #[serde(rename = "tournamentPositionId")]
+    pub tournament_position_id: i64,
+    #[serde(rename = "workoutId")]
+    pub workout_id: i64,
+    #[serde(rename = "firstName")]
+    pub first_name: String,
+    #[serde(rename = "lastName")]
+    pub last_name: String,
+    #[serde(rename = "imageUrl")]
+    pub image_url: String,
     pub points: f64,
     #[serde(rename = "isWithdrawn")]
     pub is_withdrawn: bool,
@@ -118,6 +144,16 @@ pub struct MatchupDetail {
 pub struct MatchupShotcallerDetail {
     pub points: f64,
     pub players: Vec<MatchupShotcallerPick>,
+    #[serde(rename = "propPoints")]
+    pub prop_points: f64,
+    #[serde(rename = "propPicks")]
+    pub prop_picks: Vec<PropMatchupDetail>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct MatchupShotcallerDetail2 {
+    pub points: f64,
+    pub players: Vec<MatchupShotcallerPick2>,
     #[serde(rename = "propPoints")]
     pub prop_points: f64,
     #[serde(rename = "propPicks")]
@@ -159,6 +195,15 @@ pub struct LeaderboardMatchupShotcallerResponse {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct LeaderboardMatchupShotcallerResponse2 {
+    #[serde(rename = "userMatchup")]
+    pub user_matchup: MatchupShotcallerDetail2,
+    pub workouts: Vec<WorkoutResponse>,
+    #[serde(rename = "competitorMatchup")]
+    pub competitor_matchup: MatchupShotcallerDetail2,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct LeaderboardMetadataData {
     pub competition_id: u64,
     pub competition_name: String,
@@ -185,6 +230,7 @@ pub struct CompetitionLeaderboardResponse {
     pub gender_id: i64,
     pub first_name: String,
     pub last_name: String,
+    pub image_url: String,
     pub points: f64,
     pub finishes: Vec<f64>,
     pub placement: i64,
@@ -223,6 +269,8 @@ pub struct LeaderboardShotcallerPicks {
     pub first_name: String,
     #[serde(rename = "lastName")]
     pub last_name: String,
+    #[serde(rename = "imageUrl")]
+    pub image_url: String,
     pub points: f64,
     #[serde(rename = "isWithdrawn")]
     pub is_withdrawn: bool,
@@ -392,6 +440,8 @@ pub struct WorkoutResponse {
     pub sponsor: Option<String>,
     #[serde(rename = "sponsorLink")]
     pub sponsor_link: Option<String>,
+    #[serde(rename = "shortName")]
+    pub short_name: Option<String>,
     pub stages: Option<Vec<WorkoutStage>>,
 }
 
@@ -439,6 +489,8 @@ pub struct LeagueAthletesResponse {
     pub first_name: String,
     #[serde(rename = "lastName")]
     pub last_name: String,
+    #[serde(rename = "imageUrl")]
+    pub image_url: String,
     pub adp: f64,
     #[serde(rename = "pickPercentage")]
     pub pick_percentage: Vec<PickPercentage>,
@@ -453,6 +505,8 @@ pub struct LeagueAthletesResponse {
     #[serde(rename = "positionId")]
     pub position_id: i64,
     pub position: Option<String>,
+    #[serde(rename = "countryImageUrl")]
+    pub country_image_url: Option<String>,
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug)]

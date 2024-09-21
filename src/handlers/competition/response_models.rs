@@ -40,4 +40,8 @@ pub struct ActiveCompetition {
     pub men_cut_line: Option<i64>,
     #[serde(rename = "womenCutLine")]
     pub women_cut_line: Option<i64>,
+    #[serde(rename = "isTop10Enabled")]
+    pub is_top10_enabled: bool,
+    #[serde(rename = "isShotcallerEnabled")]
+    pub is_shotcaller_enabled: bool,
 }

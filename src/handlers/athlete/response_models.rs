@@ -6,6 +6,8 @@ pub struct CompetitionCompetitorResponse {
     pub first_name: String,
     #[serde(rename = "lastName")]
     pub last_name: String,
+    #[serde(rename = "imageUrl")]
+    pub image_url: String,
     pub region: String,
     pub instagram: Option<String>,
     #[serde(rename = "newsBlurb")]

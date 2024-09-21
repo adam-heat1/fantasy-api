@@ -207,7 +207,7 @@ pub(crate) async fn update_profile_picure(
             },
             |_| {
                 HttpResponse::Ok().body(format!(
-                    "https://storage.googleapis.com/heat1-assets-pub/user/{}",
+                    "https://assets.heat1.app/user/{}",
                     req.image_url
                 ))
             },
